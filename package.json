@@ -16,6 +16,7 @@
   "author": "Iwan Contributors",
   "license": "MIT",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
     "@slack/bolt": "^4.6.0",
     "dotenv": "^17.3.1"
   }
