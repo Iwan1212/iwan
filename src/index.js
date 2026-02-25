@@ -1,7 +1,8 @@
 // src/index.js — punkt wejścia aplikacji Iwan
 require('dotenv').config();
 const { App } = require('@slack/bolt');
-const { askClaude, askClaudeWithHistory } = require('./services/claude');
+const { askClaude, askClaudeWithHistory, askClaudeWithContext } = require('./services/claude');
+const { searchSlackHistory, buildContextFromMessages } = require('./services/search');
 const { validateMessage } = require('./services/validate');
 const { checkRateLimit } = require('./services/ratelimit');
 const { classifyMessage } = require('./services/classify');
@@ -31,17 +32,26 @@ app.event('app_mention', async ({ event, say }) => {
   const kategoria = await classifyMessage(tekst);
   if (kategoria === 'spam') { await say('Nie mogę pomóc z tym zapytaniem.'); return; }
 
-  // 4. Pobierz historię rozmowy
+  // 4. Wyszukaj kontekst w historii Slack (tylko z tego kanału)
+  const wyniki = await searchSlackHistory(tekst, event.channel);
+  const kontekst = buildContextFromMessages(wyniki);
+
+  // 5. Pobierz historię rozmowy
   const historia = await getHistory(event.channel, event.thread_ts);
   const messages = historia.map(msg => ({ role: msg.role, content: msg.content }));
   messages.push({ role: 'user', content: tekst });
 
-  // 5. Odpowiedź z Claude (z historią)
-  const odpowiedz = messages.length > 1
-    ? await askClaudeWithHistory(messages)
-    : await askClaude(tekst);
+  // 6. Odpowiedź z Claude (z kontekstem i historią)
+  let odpowiedz;
+  if (kontekst) {
+    odpowiedz = await askClaudeWithContext(tekst, kontekst);
+  } else if (messages.length > 1) {
+    odpowiedz = await askClaudeWithHistory(messages);
+  } else {
+    odpowiedz = await askClaude(tekst);
+  }
 
-  // 6. Zapisz rozmowę
+  // 7. Zapisz rozmowę
   await saveMessage(event.channel, event.thread_ts, event.user, 'user', tekst);
   await saveMessage(event.channel, event.thread_ts, 'iwan', 'assistant', odpowiedz);
 
