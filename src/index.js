@@ -69,3 +69,8 @@ setupCrawler(app);
   await app.start();
   console.log('🤖 Iwan działa w Socket Mode!');
 })();
+
+// Health check — loguj co 5 minut
+setInterval(() => {
+  console.log(`💚 Iwan żyje — ${new Date().toISOString()}`);
+}, 5 * 60 * 1000);

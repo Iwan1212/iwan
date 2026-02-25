@@ -16,6 +16,9 @@
   ],
   "author": "Iwan Contributors",
   "license": "MIT",
+  "engines": {
+    "node": "20.x"
+  },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
     "@slack/bolt": "^4.6.0",
