@@ -6,6 +6,7 @@ const { validateMessage } = require('./services/validate');
 const { checkRateLimit } = require('./services/ratelimit');
 const { classifyMessage } = require('./services/classify');
 const { saveMessage, getHistory } = require('./services/memory');
+const { setupCrawler } = require('./crawler/listener');
 
 // Inicjalizacja aplikacji Slack w trybie Socket Mode
 const app = new App({
@@ -46,6 +47,9 @@ app.event('app_mention', async ({ event, say }) => {
 
   await say(odpowiedz);
 });
+
+// Włącz crawler wiadomości
+setupCrawler(app);
 
 // Start bota
 (async () => {

@@ -4,7 +4,8 @@
   "description": "Iwan — Open Source AI Agent for Slack",
   "main": "src/index.js",
   "scripts": {
-    "start": "node src/index.js"
+    "start": "node src/index.js",
+    "backfill": "node scripts/backfill.js"
   },
   "keywords": [
     "slack",
