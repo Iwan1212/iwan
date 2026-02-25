@@ -1,7 +1,7 @@
 // src/index.js — punkt wejścia aplikacji Iwan
 require('dotenv').config();
 const { App } = require('@slack/bolt');
-const { askClaude } = require('./services/claude');
+const { askClaude, askClaudeWithHistory } = require('./services/claude');
 const { validateMessage } = require('./services/validate');
 const { checkRateLimit } = require('./services/ratelimit');
 const { classifyMessage } = require('./services/classify');
@@ -36,7 +36,9 @@ app.event('app_mention', async ({ event, say }) => {
   messages.push({ role: 'user', content: tekst });
 
   // 5. Odpowiedź z Claude (z historią)
-  const odpowiedz = await askClaude(tekst);
+  const odpowiedz = messages.length > 1
+    ? await askClaudeWithHistory(messages)
+    : await askClaude(tekst);
 
   // 6. Zapisz rozmowę
   await saveMessage(event.channel, event.thread_ts, event.user, 'user', tekst);
