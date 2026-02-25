@@ -8,6 +8,7 @@ const { checkRateLimit } = require('./services/ratelimit');
 const { classifyMessage } = require('./services/classify');
 const { saveMessage, getHistory } = require('./services/memory');
 const { setupCrawler } = require('./crawler/listener');
+const { toSlackMarkdown } = require('./services/format');
 
 // Inicjalizacja aplikacji Slack w trybie Socket Mode
 const app = new App({
@@ -55,7 +56,9 @@ app.event('app_mention', async ({ event, say }) => {
   await saveMessage(event.channel, event.thread_ts, event.user, 'user', tekst);
   await saveMessage(event.channel, event.thread_ts, 'iwan', 'assistant', odpowiedz);
 
-  await say(odpowiedz);
+  // 8. Sformatuj i wyślij odpowiedź
+  const sformatowana = toSlackMarkdown(odpowiedz);
+  await say(sformatowana);
 });
 
 // Włącz crawler wiadomości
