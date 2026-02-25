@@ -17,11 +17,19 @@ async function saveMessage(channelId, threadTs, userId, role, content) {
 
 // Pobierz historię rozmowy z danego threadu
 async function getHistory(channelId, threadTs, limit = 10) {
-  const { data, error } = await supabase
+  let query = supabase
     .from('conversations')
     .select('role, content')
-    .eq('channel_id', channelId)
-    .eq('thread_ts', threadTs || 'main')
+    .eq('channel_id', channelId);
+
+  // Null thread_ts = wiadomości z głównego kanału
+  if (threadTs) {
+    query = query.eq('thread_ts', threadTs);
+  } else {
+    query = query.is('thread_ts', null);
+  }
+
+  const { data, error } = await query
     .order('created_at', { ascending: true })
     .limit(limit);
 
