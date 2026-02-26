@@ -1,5 +1,6 @@
 // src/handlers/slash.js — obsługa komendy /iwan
 const { searchSlackHistory, buildContextFromMessages } = require('../services/search');
+const { searchNotion, getPageTitle, getPageText } = require('../services/notion');
 const { resolveUserNames } = require('../services/users');
 
 // Parsuj komendę: /iwan szukaj <fraza> lub /iwan status
@@ -19,6 +20,8 @@ function setupSlashCommand(app) {
 
     if (action === 'szukaj') {
       await handleSearch(app, command, args, respond);
+    } else if (action === 'notion') {
+      await handleNotion(args, respond);
     } else if (action === 'status') {
       await handleStatus(respond);
     } else {
@@ -51,6 +54,31 @@ async function handleSearch(app, command, query, respond) {
   await respond(`Wyniki dla *${query}* (${wyniki.length}):\n${lista}`);
 }
 
+// /iwan notion <fraza> — wyszukaj w Notion
+async function handleNotion(query, respond) {
+  if (!query) {
+    await respond('Użycie: `/iwan notion <fraza>`');
+    return;
+  }
+
+  const pages = await searchNotion(query);
+
+  if (pages.length === 0) {
+    await respond(`Nie znalazłem nic w Notion dla: *${query}*`);
+    return;
+  }
+
+  const lista = [];
+  for (const page of pages.slice(0, 5)) {
+    const title = getPageTitle(page);
+    const text = await getPageText(page.id);
+    const preview = text ? text.substring(0, 150) : '(brak treści)';
+    lista.push(`• *${title}*: ${preview}`);
+  }
+
+  await respond(`Wyniki z Notion dla *${query}* (${pages.length}):\n${lista.join('\n')}`);
+}
+
 // /iwan status — pokaż status bota
 async function handleStatus(respond) {
   const uptime = process.uptime();
@@ -71,6 +99,7 @@ async function handleHelp(respond) {
   await respond(
     `*Komendy Iwana:*\n` +
     `• \`/iwan szukaj <fraza>\` — szukaj w historii kanału\n` +
+    `• \`/iwan notion <fraza>\` — szukaj w Notion\n` +
     `• \`/iwan status\` — status bota\n` +
     `• Lub po prostu napisz \`@Iwan <pytanie>\``
   );

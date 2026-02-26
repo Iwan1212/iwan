@@ -3,6 +3,7 @@ require('dotenv').config();
 const { App } = require('@slack/bolt');
 const { askClaude, askClaudeWithHistory, askClaudeWithContext } = require('./services/claude');
 const { searchSlackHistory, buildContextFromMessages } = require('./services/search');
+const { searchNotion, buildContextFromNotion } = require('./services/notion');
 const { validateMessage } = require('./services/validate');
 const { checkRateLimit } = require('./services/ratelimit');
 const { classifyMessage } = require('./services/classify');
@@ -40,10 +41,15 @@ app.event('app_mention', async ({ event, say }) => {
   const kategoria = await classifyMessage(tekst);
   if (kategoria === 'spam') { await say('Nie mogę pomóc z tym zapytaniem.'); return; }
 
-  // 4. Wyszukaj kontekst w historii Slack (tylko z tego kanału)
-  const wyniki = await searchSlackHistory(tekst, event.channel);
+  // 4. Wyszukaj kontekst w Slack i Notion (równolegle)
+  const [wyniki, notionPages] = await Promise.all([
+    searchSlackHistory(tekst, event.channel),
+    searchNotion(tekst),
+  ]);
   await resolveUserNames(app, wyniki);
-  const kontekst = buildContextFromMessages(wyniki);
+  const slackKontekst = buildContextFromMessages(wyniki);
+  const notionKontekst = await buildContextFromNotion(notionPages);
+  const kontekst = slackKontekst + notionKontekst;
 
   // 5. Pobierz historię rozmowy
   const historia = await getHistory(event.channel, event.thread_ts);
