@@ -1,7 +1,9 @@
 // src/handlers/slash.js — obsługa komendy /iwan
 const { searchSlackHistory, buildContextFromMessages } = require('../services/search');
 const { searchNotion, getPageTitle, getPageText } = require('../services/notion');
+const { getTimeline, getEmployees, getProjects, buildDateRange, getUtilPercent, getAllocPercent } = require('../services/workforce');
 const { resolveUserNames } = require('../services/users');
+const { logError } = require('../services/errors');
 
 // Parsuj komendę: /iwan szukaj <fraza> lub /iwan status
 function parseCommand(text) {
@@ -24,6 +26,14 @@ function setupSlashCommand(app) {
       await handleNotion(args, respond);
     } else if (action === 'status') {
       await handleStatus(respond);
+    } else if (action === 'team') {
+      await handleTeam(args, respond);
+    } else if (action === 'kto-wolny') {
+      await handleKtoWolny(args, respond);
+    } else if (action === 'overbooking') {
+      await handleOverbooking(respond);
+    } else if (action === 'projekty') {
+      await handleProjekty(respond);
     } else {
       await handleHelp(respond);
     }
@@ -94,12 +104,198 @@ async function handleStatus(respond) {
   );
 }
 
+// /iwan team <nazwa> — utylizacja zespołu
+async function handleTeam(teamName, respond) {
+  if (!teamName) {
+    await respond('Użycie: `/iwan team <nazwa>` (np. Frontend, Backend, QA)');
+    return;
+  }
+
+  if (!process.env.WP_API_URL) {
+    await respond('Workforce Planner nie jest skonfigurowany.');
+    return;
+  }
+
+  try {
+    const now = new Date();
+    const endDate = new Date(now);
+    endDate.setMonth(endDate.getMonth() + 1);
+    const startStr = now.toISOString().split('T')[0];
+    const endStr = endDate.toISOString().split('T')[0];
+
+    const data = await getTimeline(startStr, endStr);
+    const employees = Array.isArray(data) ? data : (data.employees || data.data || []);
+
+    const lowerTeam = teamName.toLowerCase();
+    const teamMembers = employees.filter(e => {
+      const t = (e.team || e.department || '').toLowerCase();
+      return t.includes(lowerTeam);
+    });
+
+    if (teamMembers.length === 0) {
+      await respond(`Nie znalazłem zespołu *${teamName}* w Workforce Planner.`);
+      return;
+    }
+
+    const lines = teamMembers.map(emp => {
+      const name = emp.name || `${emp.first_name || ''} ${emp.last_name || ''}`.trim();
+      const assignments = emp.assignments || [];
+      const utilization = emp.utilization || {};
+      const utilVals = Object.values(utilization).map(getUtilPercent);
+      const avgUtil = utilVals.length > 0
+        ? Math.round(utilVals.reduce((a, b) => a + b, 0) / utilVals.length)
+        : 0;
+
+      if (assignments.length === 0) {
+        return `• *${name}*: bench (0%)`;
+      }
+      const projs = assignments.map(a => {
+        const proj = a.project_name || a.project || '?';
+        const alloc = getAllocPercent(a);
+        return `${proj} (${alloc}%)`;
+      }).join(', ');
+      const marker = avgUtil > 100 ? ' ⚠️' : '';
+      return `• *${name}*: ${projs} — ${avgUtil}%${marker}`;
+    });
+
+    await respond(`*Team ${teamName}:*\n${lines.join('\n')}`);
+  } catch (error) {
+    logError('slash-team', 'Błąd pobierania danych zespołu', error.message);
+    await respond('Błąd pobierania danych z Workforce Planner.');
+  }
+}
+
+// /iwan kto-wolny [miesiąc] — kto jest dostępny
+async function handleKtoWolny(args, respond) {
+  if (!process.env.WP_API_URL) {
+    await respond('Workforce Planner nie jest skonfigurowany.');
+    return;
+  }
+
+  try {
+    const query = args || '';
+    const { startDate, endDate } = buildDateRange(query || 'teraz');
+
+    const data = await getTimeline(startDate, endDate);
+    const employees = Array.isArray(data) ? data : (data.employees || data.data || []);
+
+    const free = employees.filter(emp => {
+      const assignments = emp.assignments || [];
+      const utilization = emp.utilization || {};
+      const utilVals = Object.values(utilization).map(getUtilPercent);
+      const avgUtil = utilVals.length > 0
+        ? utilVals.reduce((a, b) => a + b, 0) / utilVals.length
+        : 0;
+      return assignments.length === 0 || avgUtil < 30;
+    });
+
+    if (free.length === 0) {
+      await respond(`Wszyscy zajęci w okresie ${startDate} — ${endDate}.`);
+      return;
+    }
+
+    const lines = free.map(emp => {
+      const name = emp.name || `${emp.first_name || ''} ${emp.last_name || ''}`.trim();
+      const team = emp.team || emp.department || '';
+      const utilization = emp.utilization || {};
+      const utilVals = Object.values(utilization).map(getUtilPercent);
+      const avgUtil = utilVals.length > 0
+        ? Math.round(utilVals.reduce((a, b) => a + b, 0) / utilVals.length)
+        : 0;
+      return `• *${name}* (${team}) — ${avgUtil}%`;
+    });
+
+    await respond(`*Wolni/dostępni (${startDate} — ${endDate}):*\n${lines.join('\n')}`);
+  } catch (error) {
+    logError('slash-kto-wolny', 'Błąd pobierania wolnych', error.message);
+    await respond('Błąd pobierania danych z Workforce Planner.');
+  }
+}
+
+// /iwan overbooking — lista przeciążonych
+async function handleOverbooking(respond) {
+  if (!process.env.WP_API_URL) {
+    await respond('Workforce Planner nie jest skonfigurowany.');
+    return;
+  }
+
+  try {
+    const now = new Date();
+    const endDate = new Date(now);
+    endDate.setMonth(endDate.getMonth() + 2);
+    const startStr = now.toISOString().split('T')[0];
+    const endStr = endDate.toISOString().split('T')[0];
+
+    const data = await getTimeline(startStr, endStr);
+    const employees = Array.isArray(data) ? data : (data.employees || data.data || []);
+
+    const overbooked = [];
+    for (const emp of employees) {
+      const name = emp.name || `${emp.first_name || ''} ${emp.last_name || ''}`.trim();
+      const team = emp.team || emp.department || '';
+      const utilization = emp.utilization || {};
+
+      for (const [month, val] of Object.entries(utilization)) {
+        const pct = getUtilPercent(val);
+        if (pct > 100) {
+          overbooked.push(`• *${name}* (${team}) — ${month}: ${pct}%`);
+        }
+      }
+    }
+
+    if (overbooked.length === 0) {
+      await respond('Brak overbookingu — nikt nie jest przeciążony! 🎉');
+      return;
+    }
+
+    await respond(`*Overbooking (${startStr} — ${endStr}):*\n${overbooked.join('\n')}`);
+  } catch (error) {
+    logError('slash-overbooking', 'Błąd pobierania overbookingu', error.message);
+    await respond('Błąd pobierania danych z Workforce Planner.');
+  }
+}
+
+// /iwan projekty — aktywne projekty z ludźmi
+async function handleProjekty(respond) {
+  if (!process.env.WP_API_URL) {
+    await respond('Workforce Planner nie jest skonfigurowany.');
+    return;
+  }
+
+  try {
+    const projects = await getProjects();
+    const projectList = Array.isArray(projects) ? projects : (projects.data || projects.projects || []);
+
+    if (projectList.length === 0) {
+      await respond('Brak aktywnych projektów w Workforce Planner.');
+      return;
+    }
+
+    const lines = projectList.slice(0, 15).map(p => {
+      const name = p.name || p.project_name || '?';
+      const members = p.members || p.employees || [];
+      const count = Array.isArray(members) ? members.length : 0;
+      const status = p.status || '';
+      return `• *${name}*${status ? ` (${status})` : ''} — ${count} osób`;
+    });
+
+    await respond(`*Aktywne projekty:*\n${lines.join('\n')}`);
+  } catch (error) {
+    logError('slash-projekty', 'Błąd pobierania projektów', error.message);
+    await respond('Błąd pobierania danych z Workforce Planner.');
+  }
+}
+
 // /iwan (bez argumentów) — pokaż pomoc
 async function handleHelp(respond) {
   await respond(
     `*Komendy Iwana:*\n` +
     `• \`/iwan szukaj <fraza>\` — szukaj w historii kanału\n` +
     `• \`/iwan notion <fraza>\` — szukaj w Notion\n` +
+    `• \`/iwan team <nazwa>\` — utylizacja zespołu (np. Frontend)\n` +
+    `• \`/iwan kto-wolny [miesiąc]\` — kto jest dostępny\n` +
+    `• \`/iwan overbooking\` — lista przeciążonych\n` +
+    `• \`/iwan projekty\` — aktywne projekty\n` +
     `• \`/iwan status\` — status bota\n` +
     `• Lub po prostu napisz \`@Iwan <pytanie>\``
   );

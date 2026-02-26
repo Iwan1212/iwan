@@ -4,6 +4,8 @@ const { App } = require('@slack/bolt');
 const { askClaude, askClaudeWithHistory, askClaudeWithContext } = require('./services/claude');
 const { searchSlackHistory, buildContextFromMessages } = require('./services/search');
 const { searchNotion, buildContextFromNotion } = require('./services/notion');
+const { searchWorkforce, buildContextFromWorkforce, shouldQueryWorkforce } = require('./services/workforce');
+const { setupWorkforceAlerts, setupWeeklySummary } = require('./services/workforceAlerts');
 const { validateMessage } = require('./services/validate');
 const { checkRateLimit } = require('./services/ratelimit');
 const { classifyMessage } = require('./services/classify');
@@ -37,19 +39,24 @@ app.event('app_mention', async ({ event, say }) => {
   const limit = checkRateLimit(event.user);
   if (!limit.allowed) { await say(limit.error); return; }
 
-  // 3. Klasyfikacja
-  const kategoria = await classifyMessage(tekst);
-  if (kategoria === 'spam') { await say('Nie mogę pomóc z tym zapytaniem.'); return; }
+  // 3. Klasyfikacja (pomiń dla zapytań workforce — krótkie frazy typu "team backend" mogą być błędnie klasyfikowane)
+  // 3. Klasyfikacja (pomiń dla zapytań workforce — krótkie frazy mogą być błędnie klasyfikowane)
+  if (!shouldQueryWorkforce(tekst)) {
+    const kategoria = await classifyMessage(tekst);
+    if (kategoria === 'spam') { await say('Nie mogę pomóc z tym zapytaniem.'); return; }
+  }
 
-  // 4. Wyszukaj kontekst w Slack i Notion (równolegle)
-  const [wyniki, notionPages] = await Promise.all([
+  // 4. Wyszukaj kontekst w Slack, Notion i Workforce (równolegle)
+  const [wyniki, notionPages, workforceData] = await Promise.all([
     searchSlackHistory(tekst, event.channel),
     searchNotion(tekst),
+    searchWorkforce(tekst),
   ]);
   await resolveUserNames(app, wyniki);
   const slackKontekst = buildContextFromMessages(wyniki);
   const notionKontekst = await buildContextFromNotion(notionPages);
-  const kontekst = slackKontekst + notionKontekst;
+  const workforceKontekst = buildContextFromWorkforce(workforceData);
+  const kontekst = slackKontekst + notionKontekst + workforceKontekst;
 
   // 5. Pobierz historię rozmowy
   const historia = await getHistory(event.channel, event.thread_ts);
@@ -87,6 +94,10 @@ setupSlashCommand(app);
 
 // Włącz crawler wiadomości
 setupCrawler(app);
+
+// Włącz alerty i weekly summary z Workforce Planner
+setupWorkforceAlerts(app);
+setupWeeklySummary(app);
 
 // Start bota
 (async () => {
