@@ -5,7 +5,8 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "backfill": "node scripts/backfill.js"
+    "backfill": "node scripts/backfill.js",
+    "test": "jest"
   },
   "keywords": [
     "slack",
