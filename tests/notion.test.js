@@ -14,11 +14,35 @@ jest.mock('@notionhq/client', () => ({
 // Ustaw token żeby klient się zainicjalizował
 process.env.NOTION_TOKEN = 'secret_test';
 
-const { searchNotion, getPageText, getPageTitle, buildContextFromNotion } = require('../src/services/notion');
+const { searchNotion, getPageText, getPageTitle, buildContextFromNotion, extractKeywords } = require('../src/services/notion');
 
 beforeEach(() => {
   mockSearch.mockReset();
   mockBlocksList.mockReset();
+});
+
+// --- extractKeywords ---
+
+describe('extractKeywords', () => {
+  it('usuwa polskie stop-words z pytania', () => {
+    expect(extractKeywords('jakie KPI ma dział delivery w Momentum'))
+      .toBe('kpi delivery momentum');
+  });
+
+  it('usuwa znaki interpunkcyjne', () => {
+    expect(extractKeywords('co było napisane w ostatnim weekly?'))
+      .toBe('weekly');
+  });
+
+  it('odrzuca krótkie słowa (<=2 znaki)', () => {
+    expect(extractKeywords('ja i ty na AI'))
+      .toBe('');
+  });
+
+  it('zwraca pusty string dla samych stop-words', () => {
+    expect(extractKeywords('co to jest?'))
+      .toBe('');
+  });
 });
 
 // --- searchNotion ---
@@ -26,25 +50,36 @@ beforeEach(() => {
 describe('searchNotion', () => {
   it('zwraca puste wyniki gdy Notion nic nie znalazł', async () => {
     mockSearch.mockResolvedValue({ results: [] });
-    const result = await searchNotion('test');
+    const result = await searchNotion('KPI delivery');
     expect(result).toEqual([]);
+  });
+
+  it('szuka po keywords zamiast pełnego zdania', async () => {
+    mockSearch.mockResolvedValue({ results: [] });
+    await searchNotion('jakie KPI ma dział delivery?');
+    expect(mockSearch).toHaveBeenCalledWith({
+      query: 'kpi delivery',
+      filter: { property: 'object', value: 'page' },
+      page_size: 5,
+    });
+  });
+
+  it('zwraca pustą tablicę gdy brak keywords', async () => {
+    const result = await searchNotion('co to jest?');
+    expect(result).toEqual([]);
+    expect(mockSearch).not.toHaveBeenCalled();
   });
 
   it('zwraca strony z wyników wyszukiwania', async () => {
     const pages = [{ id: 'page-1', properties: {} }, { id: 'page-2', properties: {} }];
     mockSearch.mockResolvedValue({ results: pages });
-    const result = await searchNotion('projekt');
+    const result = await searchNotion('KPI delivery');
     expect(result).toEqual(pages);
-    expect(mockSearch).toHaveBeenCalledWith({
-      query: 'projekt',
-      filter: { property: 'object', value: 'page' },
-      page_size: 3,
-    });
   });
 
   it('zwraca pustą tablicę przy błędzie API', async () => {
     mockSearch.mockRejectedValue(new Error('API error'));
-    const result = await searchNotion('test');
+    const result = await searchNotion('KPI delivery');
     expect(result).toEqual([]);
   });
 });
@@ -57,6 +92,7 @@ describe('getPageText', () => {
       results: [{
         type: 'paragraph',
         paragraph: { rich_text: [{ plain_text: 'Hello world' }] },
+        has_children: false,
       }],
     });
     const text = await getPageText('page-1');
@@ -68,44 +104,101 @@ describe('getPageText', () => {
       results: [{
         type: 'heading_1',
         heading_1: { rich_text: [{ plain_text: 'Tytuł' }] },
+        has_children: false,
       }],
     });
     const text = await getPageText('page-1');
     expect(text).toBe('Tytuł');
   });
 
+  it('wyciąga tekst z calloutów', async () => {
+    mockBlocksList.mockResolvedValue({
+      results: [{
+        type: 'callout',
+        callout: { rich_text: [{ plain_text: 'Ważne!' }] },
+        has_children: false,
+      }],
+    });
+    const text = await getPageText('page-1');
+    expect(text).toBe('Ważne!');
+  });
+
   it('łączy tekst z wielu bloków', async () => {
     mockBlocksList.mockResolvedValue({
       results: [
-        { type: 'heading_2', heading_2: { rich_text: [{ plain_text: 'Nagłówek' }] } },
-        { type: 'paragraph', paragraph: { rich_text: [{ plain_text: 'Treść' }] } },
+        { type: 'heading_2', heading_2: { rich_text: [{ plain_text: 'Nagłówek' }] }, has_children: false },
+        { type: 'paragraph', paragraph: { rich_text: [{ plain_text: 'Treść' }] }, has_children: false },
       ],
     });
     const text = await getPageText('page-1');
     expect(text).toBe('Nagłówek Treść');
   });
 
+  it('pobiera zagnieżdżone dzieci (tabele)', async () => {
+    mockBlocksList
+      .mockResolvedValueOnce({
+        results: [{
+          id: 'table-1',
+          type: 'table',
+          table: {},
+          has_children: true,
+        }],
+      })
+      .mockResolvedValueOnce({
+        results: [
+          { type: 'table_row', table_row: { cells: [[{ plain_text: 'KPI' }], [{ plain_text: 'Wartość' }]] } },
+          { type: 'table_row', table_row: { cells: [[{ plain_text: 'CES' }], [{ plain_text: '5.0' }]] } },
+        ],
+      });
+    const text = await getPageText('page-1');
+    expect(text).toContain('KPI | Wartość');
+    expect(text).toContain('CES | 5.0');
+  });
+
+  it('pobiera dzieci calloutów', async () => {
+    mockBlocksList
+      .mockResolvedValueOnce({
+        results: [{
+          id: 'callout-1',
+          type: 'callout',
+          callout: { rich_text: [{ plain_text: 'Info:' }] },
+          has_children: true,
+        }],
+      })
+      .mockResolvedValueOnce({
+        results: [{
+          type: 'paragraph',
+          paragraph: { rich_text: [{ plain_text: 'Szczegóły' }] },
+          has_children: false,
+        }],
+      });
+    const text = await getPageText('page-1');
+    expect(text).toContain('Info:');
+    expect(text).toContain('Szczegóły');
+  });
+
   it('pomija bloki bez tekstu', async () => {
     mockBlocksList.mockResolvedValue({
       results: [
-        { type: 'paragraph', paragraph: { rich_text: [] } },
-        { type: 'paragraph', paragraph: { rich_text: [{ plain_text: 'Coś' }] } },
+        { type: 'paragraph', paragraph: { rich_text: [] }, has_children: false },
+        { type: 'paragraph', paragraph: { rich_text: [{ plain_text: 'Coś' }] }, has_children: false },
       ],
     });
     const text = await getPageText('page-1');
     expect(text).toBe('Coś');
   });
 
-  it('obcina tekst do 500 znaków', async () => {
-    const longText = 'A'.repeat(600);
+  it('obcina tekst do 1500 znaków', async () => {
+    const longText = 'A'.repeat(2000);
     mockBlocksList.mockResolvedValue({
       results: [{
         type: 'paragraph',
         paragraph: { rich_text: [{ plain_text: longText }] },
+        has_children: false,
       }],
     });
     const text = await getPageText('page-1');
-    expect(text.length).toBe(500);
+    expect(text.length).toBe(1500);
   });
 
   it('zwraca pusty string przy błędzie API', async () => {
@@ -162,6 +255,7 @@ describe('buildContextFromNotion', () => {
       results: [{
         type: 'paragraph',
         paragraph: { rich_text: [{ plain_text: 'Treść strony' }] },
+        has_children: false,
       }],
     });
 
@@ -192,6 +286,7 @@ describe('buildContextFromNotion', () => {
       results: [{
         type: 'paragraph',
         paragraph: { rich_text: [{ plain_text: 'Tekst' }] },
+        has_children: false,
       }],
     });
 
