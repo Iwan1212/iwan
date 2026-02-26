@@ -1,6 +1,7 @@
 // Testy budowania kontekstu z wyników wyszukiwania
 // Mockujemy supabase bo nie potrzebujemy bazy do testów buildContext
 jest.mock('../src/services/supabase', () => ({ supabase: {} }));
+jest.mock('../src/services/errors', () => ({ logError: jest.fn() }));
 const { buildContextFromMessages } = require('../src/services/search');
 
 describe('buildContextFromMessages', () => {

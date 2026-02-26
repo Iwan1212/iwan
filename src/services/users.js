@@ -1,5 +1,7 @@
 // src/services/users.js
 
+const { logError } = require('./errors');
+
 const userCache = new Map();
 
 // Pobierz nazwę użytkownika z Slack API (z cache)
@@ -12,7 +14,7 @@ async function getUserName(app, userId) {
     userCache.set(userId, name);
     return name;
   } catch (error) {
-    console.error('Błąd pobierania user info:', error.message);
+    logError('users', 'Błąd pobierania user info', error.message);
     return userId;
   }
 }

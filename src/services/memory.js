@@ -1,5 +1,6 @@
 // src/services/memory.js
 const { supabase } = require('./supabase');
+const { logError } = require('./errors');
 
 // Zapisz wiadomość w historii rozmowy
 async function saveMessage(channelId, threadTs, userId, role, content) {
@@ -12,7 +13,7 @@ async function saveMessage(channelId, threadTs, userId, role, content) {
       role: role,
       content: content,
     });
-  if (error) console.error('Błąd zapisu wiadomości:', error.message);
+  if (error) logError('memory', 'Błąd zapisu wiadomości', error.message);
 }
 
 // Pobierz historię rozmowy z danego threadu
@@ -34,7 +35,7 @@ async function getHistory(channelId, threadTs, limit = 10) {
     .limit(limit);
 
   if (error) {
-    console.error('Błąd pobierania historii:', error.message);
+    logError('memory', 'Błąd pobierania historii', error.message);
     return [];
   }
   return data || [];

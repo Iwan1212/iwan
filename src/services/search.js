@@ -1,5 +1,6 @@
 // src/services/search.js
 const { supabase } = require('./supabase');
+const { logError } = require('./errors');
 
 // Wyszukaj wiadomości w historii Slack (full-text search, tylko z danego kanału)
 async function searchSlackHistory(query, channelId) {
@@ -11,7 +12,7 @@ async function searchSlackHistory(query, channelId) {
     });
 
   if (error) {
-    console.error('Błąd wyszukiwania:', error.message);
+    logError('search', 'Błąd wyszukiwania', error.message);
     return [];
   }
   return data || [];
