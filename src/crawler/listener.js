@@ -1,5 +1,6 @@
 // src/crawler/listener.js
 const { saveSlackMessage } = require('./saveMessage');
+const { getUserName } = require('../services/users');
 
 // Nasłuchuj WSZYSTKICH wiadomości w kanałach (nie tylko wzmianki)
 function setupCrawler(app) {
@@ -8,7 +9,9 @@ function setupCrawler(app) {
     if (message.subtype) return;
     // Ignoruj boty
     if (message.bot_id) return;
-    await saveSlackMessage(message);
+    // Pobierz nazwę użytkownika i dopisz do wiadomości
+    const userName = await getUserName(app, message.user);
+    await saveSlackMessage({ ...message, user_name: userName });
   });
   console.log('📡 Crawler Slack aktywny — zapisuję wiadomości z kanałów');
 }

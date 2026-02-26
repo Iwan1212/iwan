@@ -9,6 +9,7 @@ const { classifyMessage } = require('./services/classify');
 const { saveMessage, getHistory } = require('./services/memory');
 const { setupCrawler } = require('./crawler/listener');
 const { toSlackMarkdown } = require('./services/format');
+const { resolveUserNames } = require('./services/users');
 
 // Inicjalizacja aplikacji Slack w trybie Socket Mode
 const app = new App({
@@ -35,6 +36,7 @@ app.event('app_mention', async ({ event, say }) => {
 
   // 4. Wyszukaj kontekst w historii Slack (tylko z tego kanału)
   const wyniki = await searchSlackHistory(tekst, event.channel);
+  await resolveUserNames(app, wyniki);
   const kontekst = buildContextFromMessages(wyniki);
 
   // 5. Pobierz historię rozmowy
@@ -56,9 +58,10 @@ app.event('app_mention', async ({ event, say }) => {
   await saveMessage(event.channel, event.thread_ts, event.user, 'user', tekst);
   await saveMessage(event.channel, event.thread_ts, 'iwan', 'assistant', odpowiedz);
 
-  // 8. Sformatuj i wyślij odpowiedź
+  // 8. Sformatuj i wyślij odpowiedź (w wątku jeśli pytanie było w wątku)
   const sformatowana = toSlackMarkdown(odpowiedz);
-  await say(sformatowana);
+  const threadTs = event.thread_ts || event.ts;
+  await say({ text: sformatowana, thread_ts: threadTs });
 });
 
 // Włącz crawler wiadomości

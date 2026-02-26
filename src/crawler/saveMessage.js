@@ -11,6 +11,7 @@ async function saveSlackMessage(event) {
     .upsert({
       channel_id: event.channel,
       user_id: event.user,
+      user_name: event.user_name || null,
       message_text: event.text,
       thread_ts: event.thread_ts || null,
       message_ts: event.ts,
