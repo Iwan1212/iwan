@@ -10,6 +10,7 @@ const { saveMessage, getHistory } = require('./services/memory');
 const { setupCrawler } = require('./crawler/listener');
 const { toSlackMarkdown } = require('./services/format');
 const { resolveUserNames } = require('./services/users');
+const { setupSlashCommand } = require('./handlers/slash');
 
 // Inicjalizacja aplikacji Slack w trybie Socket Mode
 const app = new App({
@@ -21,6 +22,11 @@ const app = new App({
 // Obsługa wzmianek @Iwan — z guardrails
 app.event('app_mention', async ({ event, say }) => {
   const tekst = event.text.replace(/<@[A-Z0-9]+>/g, '').trim();
+
+  // 0. Reakcja 👀 — przetwarzam
+  try {
+    await app.client.reactions.add({ channel: event.channel, name: 'eyes', timestamp: event.ts });
+  } catch (_) {}
 
   // 1. Walidacja
   const walidacja = validateMessage(tekst);
@@ -62,7 +68,16 @@ app.event('app_mention', async ({ event, say }) => {
   const sformatowana = toSlackMarkdown(odpowiedz);
   const threadTs = event.thread_ts || event.ts;
   await say({ text: sformatowana, thread_ts: threadTs });
+
+  // 9. Reakcja ✅ — gotowe, usuń 👀
+  try {
+    await app.client.reactions.remove({ channel: event.channel, name: 'eyes', timestamp: event.ts });
+    await app.client.reactions.add({ channel: event.channel, name: 'white_check_mark', timestamp: event.ts });
+  } catch (_) {}
 });
+
+// Włącz slash command /iwan
+setupSlashCommand(app);
 
 // Włącz crawler wiadomości
 setupCrawler(app);
