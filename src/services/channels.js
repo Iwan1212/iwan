@@ -1,5 +1,7 @@
 // src/services/channels.js
 
+const { logError } = require('./errors');
+
 const channelCache = new Map();
 
 // Pobierz nazwę kanału z Slack API (z cache)
@@ -12,7 +14,7 @@ async function getChannelName(app, channelId) {
     channelCache.set(channelId, name);
     return name;
   } catch (error) {
-    console.error('Błąd pobierania channel info:', error.message);
+    logError('channels', 'Błąd pobierania channel info', error.message);
     return channelId;
   }
 }
