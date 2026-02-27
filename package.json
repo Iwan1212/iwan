@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node src/index.js",
     "backfill": "node scripts/backfill.js",
+    "backfill:full": "node scripts/backfillFull.js",
     "test": "jest"
   },
   "keywords": [

@@ -11,6 +11,7 @@ const { checkRateLimit } = require('./services/ratelimit');
 const { classifyMessage } = require('./services/classify');
 const { saveMessage, getHistory } = require('./services/memory');
 const { setupCrawler } = require('./crawler/listener');
+const { setupBackfillTrigger } = require('./crawler/backfillTrigger');
 const { toSlackMarkdown } = require('./services/format');
 const { resolveUserNames } = require('./services/users');
 const { setupSlashCommand } = require('./handlers/slash');
@@ -96,6 +97,9 @@ setupSlashCommand(app);
 
 // Włącz crawler wiadomości
 setupCrawler(app);
+
+// Włącz auto-backfill przy dołączeniu do kanału
+setupBackfillTrigger(app);
 
 // Włącz alerty i weekly summary z Workforce Planner
 setupWorkforceAlerts(app);
