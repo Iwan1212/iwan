@@ -13,9 +13,13 @@ jest.mock('../src/services/channels', () => ({
 jest.mock('../src/services/users', () => ({
   getUserName: jest.fn().mockResolvedValue('Jan Kowalski'),
 }));
+jest.mock('../src/handlers/approvalFlow', () => ({
+  sendApprovalRequest: jest.fn().mockResolvedValue(),
+}));
 
 const { backfillChannel, backfillAllChannels } = require('../src/crawler/backfill');
 const { setupBackfillTrigger } = require('../src/crawler/backfillTrigger');
+const { sendApprovalRequest } = require('../src/handlers/approvalFlow');
 const { getUserName } = require('../src/services/users');
 const { supabase } = require('../src/services/supabase');
 
@@ -162,54 +166,22 @@ describe('setupBackfillTrigger', () => {
     expect(app.event).toHaveBeenCalledWith('member_joined_channel', expect.any(Function));
   });
 
-  it('wysyła wiadomość powitalną gdy bot dołącza do kanału', async () => {
-    const app = createMockApp([
-      { messages: [], nextCursor: null },
-    ]);
-    app.client.chat = { postMessage: jest.fn().mockResolvedValue({ ok: true }) };
+  it('wysyła approval request gdy bot dołącza do kanału', async () => {
+    const app = createMockApp([]);
 
     setupBackfillTrigger(app);
     const handler = app.event.mock.calls[0][1];
 
-    await handler({ event: { user: 'UBOT', channel: 'C1' } });
-    expect(app.client.chat.postMessage).toHaveBeenCalledWith({
-      channel: 'C1',
-      text: expect.stringContaining('Iwan'),
-    });
+    await handler({ event: { user: 'UBOT', channel: 'C1', inviter: 'UINVITER' } });
+    expect(sendApprovalRequest).toHaveBeenCalledWith(app, 'C1', 'UINVITER');
   });
 
-  it('triggeruje backfill tylko gdy bot dołącza', async () => {
-    const app = createMockApp([
-      { messages: [], nextCursor: null },
-    ]);
-    app.client.chat = { postMessage: jest.fn().mockResolvedValue({ ok: true }) };
-
-    // Śledzenie wywołania backfill przez spy na conversations.history
-    let backfillDone;
-    const backfillPromise = new Promise(r => { backfillDone = r; });
-    const origHistory = app.client.conversations.history;
-    app.client.conversations.history = jest.fn(async (...args) => {
-      const result = await origHistory(...args);
-      backfillDone();
-      return result;
-    });
-
-    setupBackfillTrigger(app);
-    const handler = app.event.mock.calls[0][1];
-
-    // Bot dołącza — powinien triggerować
-    await handler({ event: { user: 'UBOT', channel: 'C1' } });
-    await backfillPromise;
-    expect(app.client.conversations.history).toHaveBeenCalled();
-  });
-
-  it('nie triggeruje backfillu gdy inny user dołącza', async () => {
+  it('nie wysyła approval request gdy inny user dołącza', async () => {
     const app = createMockApp([]);
     setupBackfillTrigger(app);
     const handler = app.event.mock.calls[0][1];
 
     await handler({ event: { user: 'UOTHER', channel: 'C1' } });
-    await new Promise(r => setTimeout(r, 50));
-    expect(app.client.conversations.history).not.toHaveBeenCalled();
+    expect(sendApprovalRequest).not.toHaveBeenCalled();
   });
 });

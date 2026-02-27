@@ -15,6 +15,7 @@ const { setupBackfillTrigger } = require('./crawler/backfillTrigger');
 const { toSlackMarkdown } = require('./services/format');
 const { resolveUserNames } = require('./services/users');
 const { setupSlashCommand } = require('./handlers/slash');
+const { setupApprovalActions } = require('./handlers/approvalFlow');
 
 // Inicjalizacja aplikacji Slack w trybie Socket Mode
 const app = new App({
@@ -98,8 +99,11 @@ setupSlashCommand(app);
 // Włącz crawler wiadomości
 setupCrawler(app);
 
-// Włącz auto-backfill przy dołączeniu do kanału
+// Włącz auto-backfill przy dołączeniu do kanału (z approval flow)
 setupBackfillTrigger(app);
+
+// Włącz approval actions (zatwierdzanie/odrzucanie kanałów)
+setupApprovalActions(app);
 
 // Włącz alerty i weekly summary z Workforce Planner
 setupWorkforceAlerts(app);
