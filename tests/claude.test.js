@@ -50,15 +50,21 @@ describe('askClaudeWithHistory', () => {
 });
 
 describe('askClaudeWithContext', () => {
-  it('dołącza kontekst Slack do system prompt', async () => {
+  it('dołącza kontekst Slack do system prompt i przekazuje historię', async () => {
     getCreateMock().mockResolvedValue({
       content: [{ text: 'Odpowiedź z kontekstem' }],
     });
     const context = '\n\nKONTEKST: test wiadomość';
-    await askClaudeWithContext('Pytanie', context);
+    const messages = [
+      { role: 'user', content: 'Pytanie 1' },
+      { role: 'assistant', content: 'Odp 1' },
+      { role: 'user', content: 'Pytanie 2' },
+    ];
+    await askClaudeWithContext(messages, context);
     expect(getCreateMock()).toHaveBeenCalledWith(
       expect.objectContaining({
         system: expect.stringContaining('KONTEKST: test wiadomość'),
+        messages,
       })
     );
   });

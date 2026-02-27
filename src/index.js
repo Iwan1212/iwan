@@ -46,7 +46,10 @@ app.event('app_mention', async ({ event, say }) => {
     if (kategoria === 'spam') { await say('Nie mogę pomóc z tym zapytaniem.'); return; }
   }
 
-  // 4. Wyszukaj kontekst w Slack, Notion i Workforce (równolegle)
+  // 4. Thread ID — event.thread_ts dla odpowiedzi w wątku, event.ts dla nowych wiadomości
+  const threadTs = event.thread_ts || event.ts;
+
+  // 5. Wyszukaj kontekst w Slack, Notion i Workforce (równolegle)
   const [wyniki, notionPages, workforceData] = await Promise.all([
     searchSlackHistory(tekst, event.channel),
     searchNotion(tekst),
@@ -58,31 +61,30 @@ app.event('app_mention', async ({ event, say }) => {
   const workforceKontekst = buildContextFromWorkforce(workforceData);
   const kontekst = slackKontekst + notionKontekst + workforceKontekst;
 
-  // 5. Pobierz historię rozmowy
-  const historia = await getHistory(event.channel, event.thread_ts);
+  // 6. Pobierz historię rozmowy z wątku
+  const historia = await getHistory(event.channel, threadTs);
   const messages = historia.map(msg => ({ role: msg.role, content: msg.content }));
   messages.push({ role: 'user', content: tekst });
 
-  // 6. Odpowiedź z Claude (z kontekstem i historią)
+  // 7. Odpowiedź z Claude (z kontekstem i historią)
   let odpowiedz;
   if (kontekst) {
-    odpowiedz = await askClaudeWithContext(tekst, kontekst);
+    odpowiedz = await askClaudeWithContext(messages, kontekst);
   } else if (messages.length > 1) {
     odpowiedz = await askClaudeWithHistory(messages);
   } else {
     odpowiedz = await askClaude(tekst);
   }
 
-  // 7. Zapisz rozmowę
-  await saveMessage(event.channel, event.thread_ts, event.user, 'user', tekst);
-  await saveMessage(event.channel, event.thread_ts, 'iwan', 'assistant', odpowiedz);
+  // 8. Zapisz rozmowę
+  await saveMessage(event.channel, threadTs, event.user, 'user', tekst);
+  await saveMessage(event.channel, threadTs, 'iwan', 'assistant', odpowiedz);
 
-  // 8. Sformatuj i wyślij odpowiedź (w wątku jeśli pytanie było w wątku)
+  // 9. Sformatuj i wyślij odpowiedź (w wątku)
   const sformatowana = toSlackMarkdown(odpowiedz);
-  const threadTs = event.thread_ts || event.ts;
   await say({ text: sformatowana, thread_ts: threadTs });
 
-  // 9. Reakcja ✅ — gotowe, usuń 👀
+  // 10. Reakcja ✅ — gotowe, usuń 👀
   try {
     await app.client.reactions.remove({ channel: event.channel, name: 'eyes', timestamp: event.ts });
     await app.client.reactions.add({ channel: event.channel, name: 'white_check_mark', timestamp: event.ts });

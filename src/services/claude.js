@@ -30,14 +30,14 @@ async function askClaudeWithHistory(messages) {
   return response.content[0].text;
 }
 
-// Wyślij wiadomość do Claude z kontekstem ze Slacka
-async function askClaudeWithContext(userMessage, slackContext) {
+// Wyślij wiadomość do Claude z kontekstem ze Slacka i historią rozmowy
+async function askClaudeWithContext(messages, slackContext) {
   const systemWithContext = SYSTEM_PROMPT + slackContext;
   const response = await client.messages.create({
     model: 'claude-sonnet-4-20250514',
     max_tokens: 1024,
     system: systemWithContext,
-    messages: [{ role: 'user', content: userMessage }],
+    messages: messages,
   });
   return response.content[0].text;
 }
