@@ -249,7 +249,7 @@ function buildContextFromWorkforce(data) {
           : 0;
 
         if (assignments.length === 0) {
-          lines.push(`  ${name}: wolny/a (0%)`);
+          lines.push(`  ${name}: WOLNY (0%) — brak przypisań`);
           freeCount++;
         } else {
           const parts = assignments.map(a => {
@@ -257,9 +257,10 @@ function buildContextFromWorkforce(data) {
             const alloc = getAllocPercent(a);
             return `${proj}(${alloc}%)`;
           });
-          const overFlag = avgEmpUtil > 100 ? ' OVERBOOKED!' : '';
-          lines.push(`  ${name}: ${parts.join(', ')} → util: ${avgEmpUtil}%${overFlag}`);
-          if (avgEmpUtil > 100) overbookCount++;
+          let status = '';
+          if (avgEmpUtil > 100) { status = ' OVERBOOKED!'; overbookCount++; }
+          else if (avgEmpUtil < 30) { status = ' CZĘŚCIOWO DOSTĘPNY'; freeCount++; }
+          lines.push(`  ${name}: ${parts.join(', ')} → util: ${avgEmpUtil}%${status}`);
         }
 
         if (utilVals.length > 0) {
@@ -270,7 +271,8 @@ function buildContextFromWorkforce(data) {
     }
 
     const avgUtil = empCount > 0 ? Math.round(totalUtil / empCount) : 0;
-    lines.push(`PODSUMOWANIE: Overbooking: ${overbookCount} os., Wolni: ${freeCount} os., Śr. utilization: ${avgUtil}%`);
+    lines.push(`PODSUMOWANIE: Overbooking: ${overbookCount} os., Wolni/częściowo dostępni: ${freeCount} os., Śr. utilization: ${avgUtil}%`);
+    lines.push(`INSTRUKCJA: Odpowiadając o dostępności, pokaż WSZYSTKIE osoby z niską utylizacją (<30%), nie tylko 0%. Podaj imię, team, aktualną utylizację, na jakich projektach pracują i ile mają wolnej kapacity. Formatuj czytelnie z podziałem na teamy.`);
 
     const content = lines.join('\n');
     const truncated = content.substring(0, 4000);

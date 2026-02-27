@@ -170,9 +170,9 @@ describe('buildContextFromWorkforce', () => {
     expect(result).toContain('Kowalski Jan');
     expect(result).toContain('Alpha(50%)');
     expect(result).toContain('OVERBOOKED!');
-    expect(result).toContain('Nowak Anna: wolny/a (0%)');
+    expect(result).toContain('Nowak Anna: WOLNY (0%)');
     expect(result).toContain('Overbooking: 1 os.');
-    expect(result).toContain('Wolni: 1 os.');
+    expect(result).toContain('Wolni/częściowo dostępni: 1 os.');
   });
 
   it('obsługuje dane z zagnieżdżonym obiektem employees', () => {
