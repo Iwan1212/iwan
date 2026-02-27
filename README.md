@@ -290,6 +290,7 @@ Contributions are welcome! Whether it's a bug fix, new feature, or documentation
 
 New to the project? Here are some ideas:
 
+- **Add English command aliases** — currently all commands are in Polish (`/iwan szukaj`, `/iwan kto-wolny`). Add English versions (`/iwan search`, `/iwan who-free`) — see [v0.6 roadmap](#v06--english-commands--enhanced-workforce)
 - Add a new slash command
 - Improve Claude context formatting
 - Add support for a new Workforce Planner endpoint
@@ -302,7 +303,13 @@ New to the project? Here are some ideas:
 
 > Iwan is actively developed. Here's where we're heading:
 
-### v0.6 — Enhanced Workforce
+### v0.6 — English Commands & Enhanced Workforce
+
+> **Good first contribution!** All slash commands and keyword detection are currently in Polish. We need English aliases so international teams can use Iwan too.
+
+- [ ] English command aliases — `/iwan search`, `/iwan who-free`, `/iwan projects` alongside Polish versions
+- [ ] English keyword routing — detect workforce questions in English ("who is available", "utilization", etc.)
+- [ ] English responses — allow configuring response language (EN/PL)
 - [ ] `/iwan person <name>` — individual person lookup
 - [ ] `/iwan projekty` — show assigned people per project
 - [ ] Smarter date parsing — "next week", "next month"
@@ -332,7 +339,6 @@ New to the project? Here are some ideas:
 - [ ] Write-back to Workforce Planner
 - [ ] Jira / Linear integration
 - [ ] Auto resource suggestions — "Sophie is free and has React experience → Project X?"
-- [ ] Multi-language support (EN/PL)
 
 ---
 
