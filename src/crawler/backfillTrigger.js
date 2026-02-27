@@ -11,6 +11,12 @@ function setupBackfillTrigger(app) {
 
     console.log(`📥 Bot dołączył do kanału ${event.channel} — uruchamiam backfill`);
 
+    // Wiadomość powitalna — wyślij od razu
+    await app.client.chat.postMessage({
+      channel: event.channel,
+      text: 'Cześć! Jestem Iwan — AI asystent w Momentum. Wspomnij mnie @Iwan, a postaram się pomóc. 🤖',
+    });
+
     // Fire-and-forget — nie blokuj event handlera
     backfillChannel(app, event.channel).catch(err => {
       logError('backfillTrigger', 'Błąd auto-backfillu', err.message);

@@ -162,10 +162,27 @@ describe('setupBackfillTrigger', () => {
     expect(app.event).toHaveBeenCalledWith('member_joined_channel', expect.any(Function));
   });
 
+  it('wysyła wiadomość powitalną gdy bot dołącza do kanału', async () => {
+    const app = createMockApp([
+      { messages: [], nextCursor: null },
+    ]);
+    app.client.chat = { postMessage: jest.fn().mockResolvedValue({ ok: true }) };
+
+    setupBackfillTrigger(app);
+    const handler = app.event.mock.calls[0][1];
+
+    await handler({ event: { user: 'UBOT', channel: 'C1' } });
+    expect(app.client.chat.postMessage).toHaveBeenCalledWith({
+      channel: 'C1',
+      text: expect.stringContaining('Iwan'),
+    });
+  });
+
   it('triggeruje backfill tylko gdy bot dołącza', async () => {
     const app = createMockApp([
       { messages: [], nextCursor: null },
     ]);
+    app.client.chat = { postMessage: jest.fn().mockResolvedValue({ ok: true }) };
 
     // Śledzenie wywołania backfill przez spy na conversations.history
     let backfillDone;
