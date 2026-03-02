@@ -67,11 +67,31 @@ describe('searchNotion', () => {
   it('szuka po keywords zamiast pełnego zdania', async () => {
     mockSearch.mockResolvedValue({ results: [] });
     await searchNotion('jakie KPI ma dział delivery?');
-    expect(mockSearch).toHaveBeenCalledWith({
-      query: 'kpi delivery',
-      filter: { property: 'object', value: 'page' },
-      page_size: 10,
-    });
+    expect(mockSearch).toHaveBeenCalledWith(
+      expect.objectContaining({ query: 'kpi delivery' })
+    );
+  });
+
+  it('robi dwa zapytania gdy więcej niż 1 keyword', async () => {
+    mockSearch.mockResolvedValue({ results: [] });
+    await searchNotion('strategia momentum');
+    expect(mockSearch).toHaveBeenCalledTimes(2);
+    expect(mockSearch).toHaveBeenCalledWith(
+      expect.objectContaining({ query: 'strategia momentum' })
+    );
+    expect(mockSearch).toHaveBeenCalledWith(
+      expect.objectContaining({ query: 'strategia' })
+    );
+  });
+
+  it('deduplikuje wyniki z dwóch zapytań', async () => {
+    const page1 = { id: 'p1', properties: {} };
+    const page2 = { id: 'p2', properties: {} };
+    mockSearch
+      .mockResolvedValueOnce({ results: [page1, page2] })
+      .mockResolvedValueOnce({ results: [page1] });
+    const result = await searchNotion('strategia momentum');
+    expect(result).toHaveLength(2);
   });
 
   it('zwraca pustą tablicę gdy brak keywords', async () => {

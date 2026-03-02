@@ -38,7 +38,7 @@ function extractKeywords(query) {
   return words.slice(0, 3).join(' ');
 }
 
-// Wyszukaj strony w Notion pasujące do zapytania
+// Wyszukaj strony w Notion (dwa równoległe zapytania dla lepszej trafności)
 async function searchNotion(query) {
   if (!notion) return [];
 
@@ -48,18 +48,35 @@ async function searchNotion(query) {
   if (!keywords) return [];
 
   try {
-    const response = await notion.search({
-      query: keywords,
-      filter: { property: 'object', value: 'page' },
-      page_size: 10,
-    });
-    const results = response.results || [];
+    const words = keywords.split(' ');
+    const searches = [
+      notion.search({ query: keywords, filter: { property: 'object', value: 'page' }, page_size: 10 }),
+    ];
+    // Drugie zapytanie z pierwszym keyword — Notion API daje lepsze wyniki przy krótszym query
+    if (words.length > 1) {
+      searches.push(
+        notion.search({ query: words[0], filter: { property: 'object', value: 'page' }, page_size: 10 }),
+      );
+    }
+
+    const responses = await Promise.all(searches);
+    const seen = new Set();
+    const results = [];
+    for (const r of responses) {
+      for (const page of (r.results || [])) {
+        if (!seen.has(page.id)) {
+          seen.add(page.id);
+          results.push(page);
+        }
+      }
+    }
+
     console.log(`[notion] Znaleziono ${results.length} stron`);
-    for (const p of results) {
+    for (const p of results.slice(0, 10)) {
       const title = getPageTitle(p);
       console.log(`[notion]   - "${title}"`);
     }
-    return results;
+    return results.slice(0, 10);
   } catch (error) {
     logError('notion', 'Błąd wyszukiwania Notion', error.message);
     return [];
