@@ -20,8 +20,12 @@ async function getCompanyContext() {
       .select('topic, content');
 
     if (error) throw error;
-    if (!data || data.length === 0) return '';
+    if (!data || data.length === 0) {
+      console.log('[context] Brak wpisów w company_context');
+      return '';
+    }
 
+    console.log(`[context] Pobrano ${data.length} wpisów z company_context (${data.map(r => r.topic).join(', ')})`);
     const formatted = '\n\nINFORMACJE O FIRMIE:\n' +
       data.map(row => `[${row.topic}]: ${row.content}`).join('\n');
 
