@@ -99,4 +99,54 @@ describe('askClaudeWithContext', () => {
       })
     );
   });
+
+  it('zawiera companyContext w system prompt', async () => {
+    getCreateMock().mockResolvedValue({
+      content: [{ text: 'OK' }],
+    });
+    const companyCtx = '\n\nINFORMACJE O FIRMIE:\n[firma]: Momentum';
+    await askClaudeWithContext(
+      [{ role: 'user', content: 'test' }],
+      '\n\nKONTEKST: dane',
+      'Anna',
+      companyCtx
+    );
+    expect(getCreateMock()).toHaveBeenCalledWith(
+      expect.objectContaining({
+        system: expect.stringContaining('INFORMACJE O FIRMIE'),
+      })
+    );
+  });
+});
+
+describe('companyContext w system prompt', () => {
+  it('askClaude przekazuje companyContext do system prompt', async () => {
+    getCreateMock().mockResolvedValue({
+      content: [{ text: 'OK' }],
+    });
+    const companyCtx = '\n\nINFORMACJE O FIRMIE:\n[firma]: Momentum';
+    await askClaude('Cześć', 'Jan', companyCtx);
+    expect(getCreateMock()).toHaveBeenCalledWith(
+      expect.objectContaining({
+        system: expect.stringContaining('INFORMACJE O FIRMIE'),
+      })
+    );
+  });
+
+  it('askClaudeWithHistory przekazuje companyContext do system prompt', async () => {
+    getCreateMock().mockResolvedValue({
+      content: [{ text: 'OK' }],
+    });
+    const companyCtx = '\n\nINFORMACJE O FIRMIE:\n[dzialy]: Delivery, Growth';
+    await askClaudeWithHistory(
+      [{ role: 'user', content: 'test' }],
+      'Jan',
+      companyCtx
+    );
+    expect(getCreateMock()).toHaveBeenCalledWith(
+      expect.objectContaining({
+        system: expect.stringContaining('[dzialy]: Delivery, Growth'),
+      })
+    );
+  });
 });

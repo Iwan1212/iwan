@@ -14,6 +14,7 @@ const { setupCrawler } = require('./crawler/listener');
 const { setupBackfillTrigger } = require('./crawler/backfillTrigger');
 const { toSlackMarkdown } = require('./services/format');
 const { resolveUserNames, getUserName } = require('./services/users');
+const { getCompanyContext } = require('./services/context');
 const { setupSlashCommand } = require('./handlers/slash');
 const { setupApprovalActions } = require('./handlers/approvalFlow');
 
@@ -54,9 +55,10 @@ app.event('app_mention', async ({ event, say }) => {
   // 4. Thread ID — event.thread_ts dla odpowiedzi w wątku, event.ts dla nowych wiadomości
   const threadTs = event.thread_ts || event.ts;
 
-  // 5. Resolve userName i wyszukaj kontekst (równolegle)
-  const [userName, wyniki, notionPages, workforceData] = await Promise.all([
+  // 5. Resolve userName, kontekst firmowy i wyszukaj kontekst (równolegle)
+  const [userName, companyContext, wyniki, notionPages, workforceData] = await Promise.all([
     getUserName(app, event.user),
+    getCompanyContext(),
     searchSlackHistory(tekst, event.channel, threadTs),
     searchNotion(tekst),
     searchWorkforce(tekst),
@@ -75,11 +77,11 @@ app.event('app_mention', async ({ event, say }) => {
   // 7. Odpowiedź z Claude (z kontekstem i historią)
   let odpowiedz;
   if (kontekst) {
-    odpowiedz = await askClaudeWithContext(messages, kontekst, userName);
+    odpowiedz = await askClaudeWithContext(messages, kontekst, userName, companyContext);
   } else if (messages.length > 1) {
-    odpowiedz = await askClaudeWithHistory(messages, userName);
+    odpowiedz = await askClaudeWithHistory(messages, userName, companyContext);
   } else {
-    odpowiedz = await askClaude(tekst, userName);
+    odpowiedz = await askClaude(tekst, userName, companyContext);
   }
 
   // 8. Zapisz rozmowę
