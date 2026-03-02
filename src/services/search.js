@@ -3,7 +3,7 @@ const { supabase } = require('./supabase');
 const { logError } = require('./errors');
 
 // Wyszukaj wiadomości w historii Slack (full-text search, tylko z danego kanału)
-async function searchSlackHistory(query, channelId) {
+async function searchSlackHistory(query, channelId, excludeThreadTs = null) {
   const { data, error } = await supabase
     .rpc('search_slack_messages', {
       search_query: query,
@@ -15,7 +15,13 @@ async function searchSlackHistory(query, channelId) {
     logError('search', 'Błąd wyszukiwania', error.message);
     return [];
   }
-  return data || [];
+
+  // Filtruj wiadomości z bieżącego wątku (unikaj halucynacji o "historii")
+  let results = data || [];
+  if (excludeThreadTs) {
+    results = results.filter(msg => msg.thread_ts !== excludeThreadTs);
+  }
+  return results;
 }
 
 // Zbuduj kontekst z wyników wyszukiwania

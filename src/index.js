@@ -13,7 +13,7 @@ const { saveMessage, getHistory } = require('./services/memory');
 const { setupCrawler } = require('./crawler/listener');
 const { setupBackfillTrigger } = require('./crawler/backfillTrigger');
 const { toSlackMarkdown } = require('./services/format');
-const { resolveUserNames } = require('./services/users');
+const { resolveUserNames, getUserName } = require('./services/users');
 const { setupSlashCommand } = require('./handlers/slash');
 const { setupApprovalActions } = require('./handlers/approvalFlow');
 
@@ -26,7 +26,10 @@ const app = new App({
 
 // Obsługa wzmianek @Iwan — z guardrails
 app.event('app_mention', async ({ event, say }) => {
-  const tekst = event.text.replace(/<@[A-Z0-9]+>/g, '').trim();
+  const tekst = event.text
+    .replace(/<@[A-Z0-9]+\|([^>]+)>/g, '$1')  // <@U123|Jan> → Jan
+    .replace(/<@[A-Z0-9]+>/g, '')              // <@UBOT> → usuń mention bota
+    .trim();
 
   // 0. Reakcja 👀 — przetwarzam
   try {
@@ -51,9 +54,10 @@ app.event('app_mention', async ({ event, say }) => {
   // 4. Thread ID — event.thread_ts dla odpowiedzi w wątku, event.ts dla nowych wiadomości
   const threadTs = event.thread_ts || event.ts;
 
-  // 5. Wyszukaj kontekst w Slack, Notion i Workforce (równolegle)
-  const [wyniki, notionPages, workforceData] = await Promise.all([
-    searchSlackHistory(tekst, event.channel),
+  // 5. Resolve userName i wyszukaj kontekst (równolegle)
+  const [userName, wyniki, notionPages, workforceData] = await Promise.all([
+    getUserName(app, event.user),
+    searchSlackHistory(tekst, event.channel, threadTs),
     searchNotion(tekst),
     searchWorkforce(tekst),
   ]);
@@ -71,11 +75,11 @@ app.event('app_mention', async ({ event, say }) => {
   // 7. Odpowiedź z Claude (z kontekstem i historią)
   let odpowiedz;
   if (kontekst) {
-    odpowiedz = await askClaudeWithContext(messages, kontekst);
+    odpowiedz = await askClaudeWithContext(messages, kontekst, userName);
   } else if (messages.length > 1) {
-    odpowiedz = await askClaudeWithHistory(messages);
+    odpowiedz = await askClaudeWithHistory(messages, userName);
   } else {
-    odpowiedz = await askClaude(tekst);
+    odpowiedz = await askClaude(tekst, userName);
   }
 
   // 8. Zapisz rozmowę

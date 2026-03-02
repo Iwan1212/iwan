@@ -13,10 +13,18 @@ function parseCommand(text) {
   return { action, args };
 }
 
+const ALLOWED_CHANNELS = (process.env.SLACK_ALLOWED_CHANNELS || '').split(',').filter(Boolean);
+
 // Handler slash command /iwan
 function setupSlashCommand(app) {
   app.command('/iwan', async ({ command, ack, respond }) => {
     await ack();
+
+    // Ogranicz do dozwolonych kanałów (jeśli lista ustawiona)
+    if (ALLOWED_CHANNELS.length > 0 && !ALLOWED_CHANNELS.includes(command.channel_id)) {
+      await respond('Ta komenda działa tylko na wybranych kanałach.');
+      return;
+    }
 
     const { action, args } = parseCommand(command.text);
 

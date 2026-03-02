@@ -16,7 +16,7 @@ describe('askClaude', () => {
     getCreateMock().mockResolvedValue({
       content: [{ text: 'Odpowiedź od Claude' }],
     });
-    const result = await askClaude('Cześć');
+    const result = await askClaude('Cześć', 'Jan');
     expect(result).toBe('Odpowiedź od Claude');
   });
 
@@ -24,9 +24,21 @@ describe('askClaude', () => {
     getCreateMock().mockResolvedValue({
       content: [{ text: 'OK' }],
     });
-    await askClaude('Test');
+    await askClaude('Test', 'Jan');
     expect(getCreateMock()).toHaveBeenCalledWith(
       expect.objectContaining({ model: expect.stringContaining('sonnet') })
+    );
+  });
+
+  it('zawiera userName w system prompt', async () => {
+    getCreateMock().mockResolvedValue({
+      content: [{ text: 'OK' }],
+    });
+    await askClaude('Kim jestem?', 'Jan Kamiński');
+    expect(getCreateMock()).toHaveBeenCalledWith(
+      expect.objectContaining({
+        system: expect.stringContaining('Jan Kamiński'),
+      })
     );
   });
 });
@@ -41,10 +53,13 @@ describe('askClaudeWithHistory', () => {
       { role: 'assistant', content: 'Odp 1' },
       { role: 'user', content: 'Pytanie 2' },
     ];
-    const result = await askClaudeWithHistory(messages);
+    const result = await askClaudeWithHistory(messages, 'Piotr');
     expect(result).toBe('Kontynuacja');
     expect(getCreateMock()).toHaveBeenCalledWith(
-      expect.objectContaining({ messages })
+      expect.objectContaining({
+        messages,
+        system: expect.stringContaining('Piotr'),
+      })
     );
   });
 });
@@ -60,11 +75,27 @@ describe('askClaudeWithContext', () => {
       { role: 'assistant', content: 'Odp 1' },
       { role: 'user', content: 'Pytanie 2' },
     ];
-    await askClaudeWithContext(messages, context);
+    await askClaudeWithContext(messages, context, 'Anna');
     expect(getCreateMock()).toHaveBeenCalledWith(
       expect.objectContaining({
         system: expect.stringContaining('KONTEKST: test wiadomość'),
         messages,
+      })
+    );
+  });
+
+  it('zawiera userName w system prompt z kontekstem', async () => {
+    getCreateMock().mockResolvedValue({
+      content: [{ text: 'OK' }],
+    });
+    await askClaudeWithContext(
+      [{ role: 'user', content: 'test' }],
+      '\n\nKONTEKST: dane',
+      'Anna Nowak'
+    );
+    expect(getCreateMock()).toHaveBeenCalledWith(
+      expect.objectContaining({
+        system: expect.stringContaining('Anna Nowak'),
       })
     );
   });
