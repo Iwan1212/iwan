@@ -9,8 +9,14 @@ function setupBackfillTrigger(app) {
     if (event.user !== authResult.user_id) return;
 
     console.log(`📥 Bot dołączył do kanału ${event.channel} — wysyłam approval request`);
+    console.log(`📥 Event details: user=${event.user}, inviter=${event.inviter}, channel=${event.channel}`);
 
-    await sendApprovalRequest(app, event.channel, event.inviter);
+    try {
+      await sendApprovalRequest(app, event.channel, event.inviter);
+      console.log(`✅ Approval request wysłany dla kanału ${event.channel}`);
+    } catch (err) {
+      console.error(`❌ Błąd approval request dla kanału ${event.channel}:`, err.message, err.data || '');
+    }
   });
 
   console.log('🔄 Backfill trigger aktywny — approval flow przy dołączeniu do kanału');
