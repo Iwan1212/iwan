@@ -34,9 +34,9 @@ describe('extractKeywords', () => {
       .toBe('weekly');
   });
 
-  it('odrzuca krótkie słowa (<=2 znaki)', () => {
+  it('odrzuca jednoliterowe słowa i stop-words', () => {
     expect(extractKeywords('ja i ty na AI'))
-      .toBe('');
+      .toBe('ty ai');
   });
 
   it('zwraca pusty string dla samych stop-words', () => {
@@ -60,7 +60,7 @@ describe('searchNotion', () => {
     expect(mockSearch).toHaveBeenCalledWith({
       query: 'kpi delivery',
       filter: { property: 'object', value: 'page' },
-      page_size: 5,
+      page_size: 10,
     });
   });
 

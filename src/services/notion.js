@@ -28,7 +28,7 @@ function extractKeywords(query) {
     .toLowerCase()
     .replace(/[?!.,;:()]/g, '')
     .split(/\s+/)
-    .filter(w => w.length > 2 && !STOP_WORDS.has(w));
+    .filter(w => w.length > 1 && !STOP_WORDS.has(w));
   return words.join(' ');
 }
 
@@ -45,7 +45,7 @@ async function searchNotion(query) {
     const response = await notion.search({
       query: keywords,
       filter: { property: 'object', value: 'page' },
-      page_size: 5,
+      page_size: 10,
     });
     const results = response.results || [];
     console.log(`[notion] Znaleziono ${results.length} stron`);
