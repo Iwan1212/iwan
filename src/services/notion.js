@@ -20,16 +20,22 @@ const STOP_WORDS = new Set([
   'wam', 'wie', 'więc', 'z', 'za', 'ze', 'że', 'żeby',
   'co', 'było', 'napisane', 'napisano', 'mam', 'dział', 'działu',
   'ostatnim', 'ostatni', 'ostatnia', 'ostatnie',
+  'zawiera', 'zawierał', 'zawierała', 'dotyczy', 'dotyczył', 'dotyczą',
+  'powiedz', 'opowiedz', 'opisz', 'wyjaśnij', 'znajdź', 'pokaż', 'podaj',
+  'wiesz', 'znasz', 'masz', 'możesz', 'powiesz',
+  'rok', 'roku', 'miesiąc', 'miesiąca', 'tydzień', 'tygodnia',
+  'informacje', 'informacja', 'temat', 'tematu', 'kwestia', 'kwestii',
+  'proszę', 'prosze', 'dzięki', 'dzieki', 'hej', 'cześć', 'czesc',
 ]);
 
-// Wyciągnij słowa kluczowe z pytania użytkownika
+// Wyciągnij słowa kluczowe z pytania użytkownika (max 3 dla lepszej trafności)
 function extractKeywords(query) {
   const words = query
     .toLowerCase()
     .replace(/[?!.,;:()]/g, '')
     .split(/\s+/)
     .filter(w => w.length > 1 && !STOP_WORDS.has(w));
-  return words.join(' ');
+  return words.slice(0, 3).join(' ');
 }
 
 // Wyszukaj strony w Notion pasujące do zapytania

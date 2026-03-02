@@ -43,6 +43,16 @@ describe('extractKeywords', () => {
     expect(extractKeywords('co to jest?'))
       .toBe('');
   });
+
+  it('usuwa filler words (zawiera, rok, powiedz)', () => {
+    expect(extractKeywords('co zawiera strategia momentum na 2026 rok?'))
+      .toBe('strategia momentum 2026');
+  });
+
+  it('limituje do 3 słów kluczowych', () => {
+    expect(extractKeywords('KPI delivery finance growth momentum').split(' '))
+      .toHaveLength(3);
+  });
 });
 
 // --- searchNotion ---
