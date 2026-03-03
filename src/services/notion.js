@@ -28,13 +28,30 @@ const STOP_WORDS = new Set([
   'proszę', 'prosze', 'dzięki', 'dzieki', 'hej', 'cześć', 'czesc',
 ]);
 
+// Angielskie stop-words do usunięcia z zapytań
+const ENGLISH_STOP_WORDS = new Set([
+  'a', 'an', 'the', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+  'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
+  'should', 'may', 'might', 'can', 'shall', 'must',
+  'i', 'me', 'my', 'we', 'our', 'you', 'your', 'he', 'she', 'it',
+  'they', 'them', 'their', 'its', 'him', 'her', 'us',
+  'what', 'which', 'who', 'whom', 'this', 'that', 'these', 'those',
+  'how', 'where', 'when', 'why',
+  'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'about',
+  'into', 'through', 'during', 'before', 'after', 'above', 'below',
+  'and', 'but', 'or', 'nor', 'not', 'so', 'if', 'then', 'than',
+  'tell', 'show', 'find', 'give', 'get', 'know', 'let', 'say',
+  'also', 'just', 'very', 'all', 'any', 'each', 'every', 'some',
+  'no', 'yes', 'please', 'thanks', 'thank', 'hi', 'hello', 'hey',
+]);
+
 // Wyciągnij słowa kluczowe z pytania użytkownika (max 3 dla lepszej trafności)
 function extractKeywords(query) {
   const words = query
     .toLowerCase()
     .replace(/[?!.,;:()]/g, '')
     .split(/\s+/)
-    .filter(w => w.length > 1 && !STOP_WORDS.has(w));
+    .filter(w => w.length > 1 && !STOP_WORDS.has(w) && !ENGLISH_STOP_WORDS.has(w));
   return words.slice(0, 3).join(' ');
 }
 

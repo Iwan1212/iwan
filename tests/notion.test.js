@@ -53,6 +53,26 @@ describe('extractKeywords', () => {
     expect(extractKeywords('KPI delivery finance growth momentum').split(' '))
       .toHaveLength(3);
   });
+
+  it('usuwa angielskie stop-words z pytania', () => {
+    expect(extractKeywords('what is the KPI for delivery'))
+      .toBe('kpi delivery');
+  });
+
+  it('usuwa same angielskie stop-words', () => {
+    expect(extractKeywords('tell me about the strategy'))
+      .toBe('strategy');
+  });
+
+  it('obsługuje mix polskich i angielskich stop-words', () => {
+    expect(extractKeywords('what jest the plan for projektu?'))
+      .toBe('plan projektu');
+  });
+
+  it('zwraca pusty string dla samych angielskich stop-words', () => {
+    expect(extractKeywords('what is the how can you'))
+      .toBe('');
+  });
 });
 
 // --- searchNotion ---

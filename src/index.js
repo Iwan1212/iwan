@@ -58,7 +58,7 @@ app.event('app_mention', async ({ event, say }) => {
   // 5. Resolve userName, kontekst firmowy i wyszukaj kontekst (równolegle)
   const [userName, companyContext, wyniki, notionPages, workforceData] = await Promise.all([
     getUserName(app, event.user),
-    getCompanyContext(),
+    getCompanyContext(tekst),
     searchSlackHistory(tekst, event.channel, threadTs),
     searchNotion(tekst),
     searchWorkforce(tekst),
