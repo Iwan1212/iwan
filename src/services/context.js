@@ -8,13 +8,16 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minut
 // Mapa tematów → słowa kluczowe wyzwalające dany temat
 const TOPIC_KEYWORDS = {
   'struktura-organizacyjna': new Set([
-    'kto', 'zespół', 'zespol', 'team', 'szef', 'lider', 'leader',
+    'kto', 'zespół', 'zespol', 'zespole', 'zespołu', 'team',
+    'szef', 'szefa', 'lider', 'lidera', 'leader',
     'ceo', 'cto', 'coo', 'cfo', 'delivery', 'growth', 'momentum',
-    'people', 'osoba', 'pracownik', 'struktura', 'organizacja',
-    'dział', 'dzial', 'manager', 'dyrektor', 'head',
+    'people', 'osoba', 'osoby', 'pracownik', 'pracownicy',
+    'struktura', 'struktury', 'organizacja', 'organizacji',
+    'dział', 'dzial', 'działu', 'dzialy', 'manager', 'dyrektor', 'head',
   ]),
   'strategia-2026': new Set([
-    'strategia', 'strategy', 'cel', 'plan', 'kpi', 'okr',
+    'strategia', 'strategii', 'strategię', 'strategie', 'strategy',
+    'cel', 'cele', 'plan', 'kpi', 'okr',
     'wizja', 'misja', 'roadmap', '2026', 'wzrost', 'revenue',
     'przychód', 'przychod', 'target', 'quarterly', 'kwartał', 'kwartal',
   ]),
@@ -25,8 +28,8 @@ const TOPIC_KEYWORDS = {
   ]),
   'testimoniale': new Set([
     'opinia', 'opinie', 'referencja', 'referencje', 'klient', 'klienci',
-    'feedback', 'case', 'study', 'testimonial', 'review', 'portfolio',
-    'projekt', 'realizacja',
+    'feedback', 'case', 'study', 'testimonial', 'testimoniale', 'testimoniali',
+    'review', 'portfolio', 'projekt', 'realizacja',
   ]),
 };
 
