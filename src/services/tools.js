@@ -42,7 +42,7 @@ function getToolDefinitions() {
     },
     {
       name: 'search_workforce',
-      description: 'Przeszukaj Workforce Planner — alokacje pracowników, dostępność, utylizacja, przypisania do projektów. Używaj do pytań o to kto jest wolny, kto pracuje nad czym, jaka jest utylizacja zespołu.',
+      description: 'Przeszukaj Workforce Planner — alokacje pracowników, dostępność, utylizacja, przypisania do projektów. Używaj do pytań o to kto jest wolny, kto pracuje nad czym, jaka jest utylizacja zespołu. WAŻNE: Przy pytaniach o dostępność zawsze wywołaj też search_calamari żeby uwzględnić urlopy i nieobecności.',
       input_schema: {
         type: 'object',
         properties: {
@@ -56,7 +56,7 @@ function getToolDefinitions() {
     },
     {
       name: 'search_calamari',
-      description: 'Sprawdź urlopy i nieobecności w Calamari. Używaj do pytań o to kto jest na urlopie, kto będzie nieobecny, ile urlopu zostało. Uzupełnia dane z Workforce Planner o informacje o nieobecnościach.',
+      description: 'Sprawdź urlopy i nieobecności w Calamari. Używaj do pytań o to kto jest na urlopie, kto będzie nieobecny, ile urlopu zostało. WAŻNE: Zawsze wywołuj razem z search_workforce przy pytaniach o dostępność zespołu.',
       input_schema: {
         type: 'object',
         properties: {
