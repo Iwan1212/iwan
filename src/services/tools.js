@@ -54,6 +54,20 @@ function getToolDefinitions() {
         required: ['query'],
       },
     },
+    {
+      name: 'search_calamari',
+      description: 'Sprawdź urlopy i nieobecności w Calamari. Używaj do pytań o to kto jest na urlopie, kto będzie nieobecny, ile urlopu zostało. Uzupełnia dane z Workforce Planner o informacje o nieobecnościach.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description: 'Zapytanie dotyczące urlopów/nieobecności pracowników',
+          },
+        },
+        required: ['query'],
+      },
+    },
   ];
 }
 

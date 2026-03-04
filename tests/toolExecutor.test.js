@@ -32,12 +32,13 @@ describe('createToolExecutors', () => {
 
   beforeEach(() => jest.clearAllMocks());
 
-  it('zwraca obiekt z 4 executorami', () => {
+  it('zwraca obiekt z 5 executorami', () => {
     const executors = createToolExecutors(mockApp, channelId, threadTs);
     expect(executors).toHaveProperty('read_thread');
     expect(executors).toHaveProperty('search_slack_history');
     expect(executors).toHaveProperty('search_notion');
     expect(executors).toHaveProperty('search_workforce');
+    expect(executors).toHaveProperty('search_calamari');
   });
 
   it('read_thread pobiera wiadomości z wątku via Slack API', async () => {

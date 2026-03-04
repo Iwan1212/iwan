@@ -2,10 +2,10 @@
 const { getToolDefinitions } = require('../src/services/tools');
 
 describe('getToolDefinitions', () => {
-  it('zwraca tablicę 4 narzędzi', () => {
+  it('zwraca tablicę 5 narzędzi', () => {
     const tools = getToolDefinitions();
     expect(Array.isArray(tools)).toBe(true);
-    expect(tools).toHaveLength(4);
+    expect(tools).toHaveLength(5);
   });
 
   it('każde narzędzie ma wymagane pola Anthropic API', () => {
@@ -18,12 +18,13 @@ describe('getToolDefinitions', () => {
     }
   });
 
-  it('zawiera read_thread, search_slack_history, search_notion, search_workforce', () => {
+  it('zawiera read_thread, search_slack_history, search_notion, search_workforce, search_calamari', () => {
     const names = getToolDefinitions().map(t => t.name);
     expect(names).toContain('read_thread');
     expect(names).toContain('search_slack_history');
     expect(names).toContain('search_notion');
     expect(names).toContain('search_workforce');
+    expect(names).toContain('search_calamari');
   });
 
   it('read_thread nie wymaga parametrów', () => {

@@ -4,6 +4,7 @@ const { searchSlackHistory, buildContextFromMessages } = require('./search');
 const { getUserName } = require('./users');
 const { searchNotion, buildContextFromNotion } = require('./notion');
 const { buildDateRange, getTimeline, buildContextFromWorkforce } = require('./workforce');
+const { getAbsences, buildCalamariDateRange, buildContextFromCalamari } = require('./calamari');
 const { resolveUserNames } = require('./users');
 const { logError } = require('./errors');
 
@@ -55,6 +56,12 @@ function createToolExecutors(app, channelId, threadTs) {
       const { startDate, endDate } = buildDateRange(query);
       const data = await getTimeline(startDate, endDate);
       return buildContextFromWorkforce(data);
+    },
+
+    search_calamari: async ({ query }) => {
+      const { startDate, endDate } = buildCalamariDateRange(query);
+      const absences = await getAbsences(startDate, endDate);
+      return buildContextFromCalamari(absences);
     },
   };
 }
