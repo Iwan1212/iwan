@@ -113,9 +113,12 @@ function buildContextFromCalendar(events) {
     byDay[day].push(e);
   }
 
+  const DAY_NAMES = ['niedziela', 'poniedziałek', 'wtorek', 'środa', 'czwartek', 'piątek', 'sobota'];
+
   const lines = [];
   for (const [day, dayEvents] of Object.entries(byDay).sort()) {
-    lines.push(`  ${day}:`);
+    const dayName = DAY_NAMES[new Date(day + 'T00:00:00').getDay()];
+    lines.push(`  ${day} (${dayName}):`);
     for (const e of dayEvents) {
       const time = formatEventTime(e.start, e.end);
       const attendeesStr = e.attendees.length > 0
