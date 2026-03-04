@@ -93,10 +93,13 @@ function formatEventTime(start, end) {
   return `${fmt(start)}-${fmt(end)}`;
 }
 
-// Reużyj buildDateRange z workforce.js
+// Reużyj buildDateRange z workforce.js, ale ogranicz startDate do dziś
 function buildCalendarDateRange(query) {
   const { buildDateRange } = require('./workforce');
-  return buildDateRange(query);
+  const range = buildDateRange(query);
+  const today = new Date().toISOString().split('T')[0];
+  if (range.startDate < today) range.startDate = today;
+  return range;
 }
 
 // Zbuduj kontekst z wydarzeń dla Claude

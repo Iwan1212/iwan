@@ -143,11 +143,13 @@ describe('getEvents', () => {
 });
 
 describe('buildCalendarDateRange', () => {
-  it('deleguje do buildDateRange z workforce', () => {
+  it('deleguje do buildDateRange z workforce i ogranicza startDate do dziś', () => {
     const { buildDateRange } = require('../src/services/workforce');
     const result = buildCalendarDateRange('spotkania w marcu');
     expect(buildDateRange).toHaveBeenCalledWith('spotkania w marcu');
-    expect(result).toEqual({ startDate: '2026-03-01', endDate: '2026-03-31' });
+    const today = new Date().toISOString().split('T')[0];
+    expect(result.startDate).toBe(today);
+    expect(result.endDate).toBe('2026-03-31');
   });
 });
 

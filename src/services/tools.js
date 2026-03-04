@@ -70,7 +70,7 @@ function getToolDefinitions() {
     },
     {
       name: 'search_calendar',
-      description: 'Przeszukaj Google Calendar — spotkania, wydarzenia, dostępność. Używaj do pytań o spotkania, harmonogram dnia, co jest zaplanowane, kiedy ktoś jest zajęty.',
+      description: 'Przeszukaj Google Calendar — spotkania, wydarzenia, dostępność. Używaj do pytań o spotkania, harmonogram dnia, co jest zaplanowane, kiedy ktoś jest zajęty. WAŻNE: Brak wydarzeń w kalendarzu NIE oznacza dnia wolnego — dni wolne to tylko soboty i niedziele. Nie mów użytkownikowi że ma wolny dzień tylko dlatego że nie ma spotkań.',
       input_schema: {
         type: 'object',
         properties: {
