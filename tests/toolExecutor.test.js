@@ -16,13 +16,14 @@ jest.mock('../src/services/workforce', () => ({
 }));
 jest.mock('../src/services/users', () => ({
   resolveUserNames: jest.fn(),
+  getUserName: jest.fn(),
 }));
 
 const { createToolExecutors, executeToolCalls, MAX_TOOL_ROUNDS } = require('../src/services/toolExecutor');
 const { searchSlackHistory, buildContextFromMessages } = require('../src/services/search');
 const { searchNotion, buildContextFromNotion } = require('../src/services/notion');
 const { buildDateRange, getTimeline, buildContextFromWorkforce } = require('../src/services/workforce');
-const { resolveUserNames } = require('../src/services/users');
+const { resolveUserNames, getUserName } = require('../src/services/users');
 
 describe('createToolExecutors', () => {
   const mockApp = {};
@@ -31,11 +32,40 @@ describe('createToolExecutors', () => {
 
   beforeEach(() => jest.clearAllMocks());
 
-  it('zwraca obiekt z 3 executorami', () => {
+  it('zwraca obiekt z 4 executorami', () => {
     const executors = createToolExecutors(mockApp, channelId, threadTs);
+    expect(executors).toHaveProperty('read_thread');
     expect(executors).toHaveProperty('search_slack_history');
     expect(executors).toHaveProperty('search_notion');
     expect(executors).toHaveProperty('search_workforce');
+  });
+
+  it('read_thread pobiera wiadomości z wątku via Slack API', async () => {
+    const mockApp = {
+      client: {
+        conversations: {
+          replies: jest.fn().mockResolvedValue({
+            messages: [
+              { user: 'U1', ts: '1709560000.000', text: 'Pierwsza wiadomość' },
+              { user: 'U2', ts: '1709560100.000', text: 'Odpowiedź' },
+            ],
+          }),
+        },
+      },
+    };
+    getUserName.mockResolvedValue('Jan');
+
+    const executors = createToolExecutors(mockApp, channelId, threadTs);
+    const result = await executors.read_thread();
+
+    expect(mockApp.client.conversations.replies).toHaveBeenCalledWith({
+      channel: channelId,
+      ts: threadTs,
+      limit: 50,
+    });
+    expect(result).toContain('WIADOMOŚCI Z BIEŻĄCEGO WĄTKU');
+    expect(result).toContain('Pierwsza wiadomość');
+    expect(result).toContain('Odpowiedź');
   });
 
   it('search_slack_history woła searchSlackHistory z channelId i threadTs', async () => {

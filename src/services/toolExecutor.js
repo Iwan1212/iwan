@@ -1,6 +1,7 @@
 // src/services/toolExecutor.js — wykonywanie narzędzi Claude tool use
 
 const { searchSlackHistory, buildContextFromMessages } = require('./search');
+const { getUserName } = require('./users');
 const { searchNotion, buildContextFromNotion } = require('./notion');
 const { buildDateRange, getTimeline, buildContextFromWorkforce } = require('./workforce');
 const { resolveUserNames } = require('./users');
@@ -11,6 +12,34 @@ const MAX_TOOL_ROUNDS = 3;
 // Factory — tworzy executory z closure na app, channelId, threadTs
 function createToolExecutors(app, channelId, threadTs) {
   return {
+    read_thread: async () => {
+      try {
+        const result = await app.client.conversations.replies({
+          channel: channelId,
+          ts: threadTs,
+          limit: 50,
+        });
+        const messages = result.messages || [];
+        if (messages.length === 0) return 'Brak wiadomości w wątku.';
+
+        const lines = [];
+        for (const msg of messages) {
+          if (msg.subtype === 'bot_message' && msg.username === 'Iwan') continue;
+          const name = msg.user ? await getUserName(app, msg.user) : 'bot';
+          const date = new Date(parseFloat(msg.ts) * 1000).toLocaleString('pl-PL');
+          const text = msg.text || '';
+          lines.push(`[${date}] ${name}: ${text}`);
+        }
+        if (lines.length === 0) return 'Brak wiadomości w wątku.';
+
+        const content = lines.join('\n').substring(0, 4000);
+        return `\n\nWIADOMOŚCI Z BIEŻĄCEGO WĄTKU:\n---\n${content}\n---\n`;
+      } catch (error) {
+        logError('toolExecutor', 'Błąd odczytu wątku', error.message);
+        return 'Nie udało się odczytać wątku.';
+      }
+    },
+
     search_slack_history: async ({ query }) => {
       const results = await searchSlackHistory(query, channelId, threadTs);
       await resolveUserNames(app, results);

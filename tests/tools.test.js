@@ -2,10 +2,10 @@
 const { getToolDefinitions } = require('../src/services/tools');
 
 describe('getToolDefinitions', () => {
-  it('zwraca tablicę 3 narzędzi', () => {
+  it('zwraca tablicę 4 narzędzi', () => {
     const tools = getToolDefinitions();
     expect(Array.isArray(tools)).toBe(true);
-    expect(tools).toHaveLength(3);
+    expect(tools).toHaveLength(4);
   });
 
   it('każde narzędzie ma wymagane pola Anthropic API', () => {
@@ -15,16 +15,20 @@ describe('getToolDefinitions', () => {
       expect(tool).toHaveProperty('description');
       expect(tool).toHaveProperty('input_schema');
       expect(tool.input_schema.type).toBe('object');
-      expect(tool.input_schema.properties).toHaveProperty('query');
-      expect(tool.input_schema.required).toContain('query');
     }
   });
 
-  it('zawiera search_slack_history, search_notion, search_workforce', () => {
+  it('zawiera read_thread, search_slack_history, search_notion, search_workforce', () => {
     const names = getToolDefinitions().map(t => t.name);
+    expect(names).toContain('read_thread');
     expect(names).toContain('search_slack_history');
     expect(names).toContain('search_notion');
     expect(names).toContain('search_workforce');
+  });
+
+  it('read_thread nie wymaga parametrów', () => {
+    const readThread = getToolDefinitions().find(t => t.name === 'read_thread');
+    expect(readThread.input_schema.required).toEqual([]);
   });
 
   it('nie zawiera channelId ani threadTs w schemacie', () => {
