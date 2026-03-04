@@ -20,10 +20,10 @@ async function calamariFetch(path, body = {}) {
   return res.json();
 }
 
-// Pobierz nieobecności w danym zakresie dat (tylko zaakceptowane)
+// Pobierz nieobecności w danym zakresie dat (zaakceptowane + oczekujące)
 async function getAbsences(from, to) {
   const data = await calamariFetch('/api/leave/request/v1/find-advanced', { from, to });
-  return (data || []).filter(r => r.status === 'ACCEPTED');
+  return (data || []).filter(r => r.status === 'ACCEPTED' || r.status === 'PENDING');
 }
 
 // Parsuj zakres dat z zapytania (reużywa logikę z workforce)
@@ -48,11 +48,15 @@ function buildContextFromCalamari(absences) {
       from: a.from,
       to: a.to,
       days: a.entitlementAmount || 0,
+      status: a.status,
     });
   }
 
   for (const [name, entries] of Object.entries(byPerson)) {
-    const parts = entries.map(e => `${e.type} (${e.from} → ${e.to}, ${e.days}d)`);
+    const parts = entries.map(e => {
+      const pending = e.status === 'PENDING' ? ' [OCZEKUJE NA AKCEPTACJĘ]' : '';
+      return `${e.type} (${e.from} → ${e.to}, ${e.days}d)${pending}`;
+    });
     lines.push(`  ${name}: ${parts.join(', ')}`);
   }
 
