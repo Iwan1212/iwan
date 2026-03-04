@@ -143,6 +143,6 @@ describe('askClaudeWithTools', () => {
 
     const callArgs = getCreateMock().mock.calls[0][0];
     expect(callArgs).toHaveProperty('tools');
-    expect(callArgs.tools).toHaveLength(5);
+    expect(callArgs.tools).toHaveLength(7);
   });
 });

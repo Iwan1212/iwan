@@ -5,6 +5,7 @@ const { getUserName } = require('./users');
 const { searchNotion, buildContextFromNotion } = require('./notion');
 const { buildDateRange, getTimeline, buildContextFromWorkforce } = require('./workforce');
 const { getAbsences, buildCalamariDateRange, buildContextFromCalamari } = require('./calamari');
+const { getEvents, buildCalendarDateRange, buildContextFromCalendar, createCalendarEvent } = require('./calendar');
 const { resolveUserNames } = require('./users');
 const { logError } = require('./errors');
 
@@ -62,6 +63,22 @@ function createToolExecutors(app, channelId, threadTs) {
       const { startDate, endDate } = buildCalamariDateRange(query);
       const absences = await getAbsences(startDate, endDate);
       return buildContextFromCalamari(absences);
+    },
+
+    search_calendar: async ({ query }) => {
+      const { startDate, endDate } = buildCalendarDateRange(query);
+      const events = await getEvents(startDate, endDate);
+      return buildContextFromCalendar(events);
+    },
+
+    create_event: async ({ title, start_datetime, end_datetime, attendees, description }) => {
+      return await createCalendarEvent({
+        title,
+        startDateTime: start_datetime,
+        endDateTime: end_datetime,
+        attendees,
+        description,
+      });
     },
   };
 }

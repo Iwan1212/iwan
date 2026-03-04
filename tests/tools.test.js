@@ -2,10 +2,10 @@
 const { getToolDefinitions } = require('../src/services/tools');
 
 describe('getToolDefinitions', () => {
-  it('zwraca tablicę 5 narzędzi', () => {
+  it('zwraca tablicę 7 narzędzi', () => {
     const tools = getToolDefinitions();
     expect(Array.isArray(tools)).toBe(true);
-    expect(tools).toHaveLength(5);
+    expect(tools).toHaveLength(7);
   });
 
   it('każde narzędzie ma wymagane pola Anthropic API', () => {
@@ -18,13 +18,15 @@ describe('getToolDefinitions', () => {
     }
   });
 
-  it('zawiera read_thread, search_slack_history, search_notion, search_workforce, search_calamari', () => {
+  it('zawiera read_thread, search_slack_history, search_notion, search_workforce, search_calamari, search_calendar, create_event', () => {
     const names = getToolDefinitions().map(t => t.name);
     expect(names).toContain('read_thread');
     expect(names).toContain('search_slack_history');
     expect(names).toContain('search_notion');
     expect(names).toContain('search_workforce');
     expect(names).toContain('search_calamari');
+    expect(names).toContain('search_calendar');
+    expect(names).toContain('create_event');
   });
 
   it('read_thread nie wymaga parametrów', () => {
@@ -39,5 +41,12 @@ describe('getToolDefinitions', () => {
       expect(props).not.toContain('channelId');
       expect(props).not.toContain('threadTs');
     }
+  });
+
+  it('create_event wymaga title, start_datetime, end_datetime', () => {
+    const createEvent = getToolDefinitions().find(t => t.name === 'create_event');
+    expect(createEvent.input_schema.required).toEqual(['title', 'start_datetime', 'end_datetime']);
+    expect(createEvent.input_schema.properties).toHaveProperty('attendees');
+    expect(createEvent.input_schema.properties).toHaveProperty('description');
   });
 });

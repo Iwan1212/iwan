@@ -68,6 +68,51 @@ function getToolDefinitions() {
         required: ['query'],
       },
     },
+    {
+      name: 'search_calendar',
+      description: 'Przeszukaj Google Calendar — spotkania, wydarzenia, dostępność. Używaj do pytań o spotkania, harmonogram dnia, co jest zaplanowane, kiedy ktoś jest zajęty.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description: 'Zapytanie dotyczące spotkań/wydarzeń w kalendarzu',
+          },
+        },
+        required: ['query'],
+      },
+    },
+    {
+      name: 'create_event',
+      description: 'Utwórz nowe spotkanie/wydarzenie w Google Calendar. Używaj gdy użytkownik chce umówić spotkanie, zaplanować meeting, dodać wydarzenie do kalendarza.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          title: {
+            type: 'string',
+            description: 'Tytuł spotkania/wydarzenia',
+          },
+          start_datetime: {
+            type: 'string',
+            description: 'Data i godzina rozpoczęcia w formacie ISO 8601 (np. 2026-03-07T10:00:00+01:00)',
+          },
+          end_datetime: {
+            type: 'string',
+            description: 'Data i godzina zakończenia w formacie ISO 8601 (np. 2026-03-07T11:00:00+01:00)',
+          },
+          attendees: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Lista adresów email uczestników (opcjonalne)',
+          },
+          description: {
+            type: 'string',
+            description: 'Opis spotkania (opcjonalne)',
+          },
+        },
+        required: ['title', 'start_datetime', 'end_datetime'],
+      },
+    },
   ];
 }
 

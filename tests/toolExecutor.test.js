@@ -14,6 +14,12 @@ jest.mock('../src/services/workforce', () => ({
   getTimeline: jest.fn(),
   buildContextFromWorkforce: jest.fn(),
 }));
+jest.mock('../src/services/calendar', () => ({
+  getEvents: jest.fn(),
+  buildCalendarDateRange: jest.fn(),
+  buildContextFromCalendar: jest.fn(),
+  createCalendarEvent: jest.fn(),
+}));
 jest.mock('../src/services/users', () => ({
   resolveUserNames: jest.fn(),
   getUserName: jest.fn(),
@@ -23,6 +29,7 @@ const { createToolExecutors, executeToolCalls, MAX_TOOL_ROUNDS } = require('../s
 const { searchSlackHistory, buildContextFromMessages } = require('../src/services/search');
 const { searchNotion, buildContextFromNotion } = require('../src/services/notion');
 const { buildDateRange, getTimeline, buildContextFromWorkforce } = require('../src/services/workforce');
+const { getEvents, buildCalendarDateRange, buildContextFromCalendar, createCalendarEvent } = require('../src/services/calendar');
 const { resolveUserNames, getUserName } = require('../src/services/users');
 
 describe('createToolExecutors', () => {
@@ -32,13 +39,15 @@ describe('createToolExecutors', () => {
 
   beforeEach(() => jest.clearAllMocks());
 
-  it('zwraca obiekt z 5 executorami', () => {
+  it('zwraca obiekt z 7 executorami', () => {
     const executors = createToolExecutors(mockApp, channelId, threadTs);
     expect(executors).toHaveProperty('read_thread');
     expect(executors).toHaveProperty('search_slack_history');
     expect(executors).toHaveProperty('search_notion');
     expect(executors).toHaveProperty('search_workforce');
     expect(executors).toHaveProperty('search_calamari');
+    expect(executors).toHaveProperty('search_calendar');
+    expect(executors).toHaveProperty('create_event');
   });
 
   it('read_thread pobiera wiadomości z wątku via Slack API', async () => {
@@ -107,6 +116,42 @@ describe('createToolExecutors', () => {
     expect(getTimeline).toHaveBeenCalledWith('2026-03-01', '2026-03-31');
     expect(buildContextFromWorkforce).toHaveBeenCalledWith({ employees: [] });
     expect(result).toBe('kontekst workforce');
+  });
+
+  it('search_calendar woła buildCalendarDateRange + getEvents + buildContextFromCalendar', async () => {
+    buildCalendarDateRange.mockReturnValue({ startDate: '2026-03-01', endDate: '2026-03-31' });
+    getEvents.mockResolvedValue([{ title: 'Standup' }]);
+    buildContextFromCalendar.mockReturnValue('kontekst calendar');
+
+    const executors = createToolExecutors(mockApp, channelId, threadTs);
+    const result = await executors.search_calendar({ query: 'spotkania w marcu' });
+
+    expect(buildCalendarDateRange).toHaveBeenCalledWith('spotkania w marcu');
+    expect(getEvents).toHaveBeenCalledWith('2026-03-01', '2026-03-31');
+    expect(buildContextFromCalendar).toHaveBeenCalledWith([{ title: 'Standup' }]);
+    expect(result).toBe('kontekst calendar');
+  });
+
+  it('create_event woła createCalendarEvent z parametrami', async () => {
+    createCalendarEvent.mockResolvedValue('Utworzono wydarzenie "Planning" (2026-03-07T10:00:00 → 2026-03-07T11:00:00)');
+
+    const executors = createToolExecutors(mockApp, channelId, threadTs);
+    const result = await executors.create_event({
+      title: 'Planning',
+      start_datetime: '2026-03-07T10:00:00+01:00',
+      end_datetime: '2026-03-07T11:00:00+01:00',
+      attendees: ['jan@test.com'],
+      description: 'Sprint planning',
+    });
+
+    expect(createCalendarEvent).toHaveBeenCalledWith({
+      title: 'Planning',
+      startDateTime: '2026-03-07T10:00:00+01:00',
+      endDateTime: '2026-03-07T11:00:00+01:00',
+      attendees: ['jan@test.com'],
+      description: 'Sprint planning',
+    });
+    expect(result).toContain('Planning');
   });
 });
 
