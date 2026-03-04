@@ -5,6 +5,10 @@ const { askClaude, askClaudeWithHistory, askClaudeWithContext } = require('./ser
 const { searchSlackHistory, buildContextFromMessages } = require('./services/search');
 const { searchNotion, buildContextFromNotion } = require('./services/notion');
 const { searchWorkforce, buildContextFromWorkforce, shouldQueryWorkforce } = require('./services/workforce');
+const { askClaudeWithTools } = require('./services/claudeTools');
+const { createToolExecutors } = require('./services/toolExecutor');
+
+const useTools = process.env.ENABLE_TOOL_USE === 'true';
 const { setupWorkforceAlerts, setupWeeklySummary } = require('./services/workforceAlerts');
 const { validateMessage } = require('./services/validate');
 const { checkRateLimit } = require('./services/ratelimit');
@@ -55,33 +59,40 @@ app.event('app_mention', async ({ event, say }) => {
   // 4. Thread ID — event.thread_ts dla odpowiedzi w wątku, event.ts dla nowych wiadomości
   const threadTs = event.thread_ts || event.ts;
 
-  // 5. Resolve userName, kontekst firmowy i wyszukaj kontekst (równolegle)
-  const [userName, companyContext, wyniki, notionPages, workforceData] = await Promise.all([
+  // 5-7. Dwa tryby: tool use (Claude decyduje co odpytać) lub legacy (wszystko na raz)
+  const [userName, companyContext] = await Promise.all([
     getUserName(app, event.user),
     getCompanyContext(tekst),
-    searchSlackHistory(tekst, event.channel, threadTs),
-    searchNotion(tekst),
-    searchWorkforce(tekst),
   ]);
-  await resolveUserNames(app, wyniki);
-  const slackKontekst = buildContextFromMessages(wyniki);
-  const notionKontekst = await buildContextFromNotion(notionPages);
-  const workforceKontekst = buildContextFromWorkforce(workforceData);
-  const kontekst = slackKontekst + notionKontekst + workforceKontekst;
-
-  // 6. Pobierz historię rozmowy z wątku
   const historia = await getHistory(event.channel, threadTs);
   const messages = historia.map(msg => ({ role: msg.role, content: msg.content }));
   messages.push({ role: 'user', content: tekst });
 
-  // 7. Odpowiedź z Claude (z kontekstem i historią)
   let odpowiedz;
-  if (kontekst) {
-    odpowiedz = await askClaudeWithContext(messages, kontekst, userName, companyContext);
-  } else if (messages.length > 1) {
-    odpowiedz = await askClaudeWithHistory(messages, userName, companyContext);
+  if (useTools) {
+    // Nowy flow: Claude decyduje które źródła odpytać
+    const executors = createToolExecutors(app, event.channel, threadTs);
+    odpowiedz = await askClaudeWithTools(messages, executors, userName, companyContext);
   } else {
-    odpowiedz = await askClaude(tekst, userName, companyContext);
+    // Legacy flow: wszystkie źródła odpytywane równolegle
+    const [wyniki, notionPages, workforceData] = await Promise.all([
+      searchSlackHistory(tekst, event.channel, threadTs),
+      searchNotion(tekst),
+      searchWorkforce(tekst),
+    ]);
+    await resolveUserNames(app, wyniki);
+    const slackKontekst = buildContextFromMessages(wyniki);
+    const notionKontekst = await buildContextFromNotion(notionPages);
+    const workforceKontekst = buildContextFromWorkforce(workforceData);
+    const kontekst = slackKontekst + notionKontekst + workforceKontekst;
+
+    if (kontekst) {
+      odpowiedz = await askClaudeWithContext(messages, kontekst, userName, companyContext);
+    } else if (messages.length > 1) {
+      odpowiedz = await askClaudeWithHistory(messages, userName, companyContext);
+    } else {
+      odpowiedz = await askClaude(tekst, userName, companyContext);
+    }
   }
 
   // 8. Zapisz rozmowę
