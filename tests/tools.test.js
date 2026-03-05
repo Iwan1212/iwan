@@ -5,7 +5,7 @@ describe('getToolDefinitions', () => {
   it('zwraca tablicę 7 narzędzi', () => {
     const tools = getToolDefinitions();
     expect(Array.isArray(tools)).toBe(true);
-    expect(tools).toHaveLength(7);
+    expect(tools).toHaveLength(8);
   });
 
   it('każde narzędzie ma wymagane pola Anthropic API', () => {
@@ -21,6 +21,7 @@ describe('getToolDefinitions', () => {
   it('zawiera read_thread, search_slack_history, search_notion, search_workforce, search_calamari, search_calendar, create_event', () => {
     const names = getToolDefinitions().map(t => t.name);
     expect(names).toContain('read_thread');
+    expect(names).toContain('read_channel');
     expect(names).toContain('search_slack_history');
     expect(names).toContain('search_notion');
     expect(names).toContain('search_workforce');

@@ -39,9 +39,10 @@ describe('createToolExecutors', () => {
 
   beforeEach(() => jest.clearAllMocks());
 
-  it('zwraca obiekt z 7 executorami', () => {
+  it('zwraca obiekt z 8 executorami', () => {
     const executors = createToolExecutors(mockApp, channelId, threadTs);
     expect(executors).toHaveProperty('read_thread');
+    expect(executors).toHaveProperty('read_channel');
     expect(executors).toHaveProperty('search_slack_history');
     expect(executors).toHaveProperty('search_notion');
     expect(executors).toHaveProperty('search_workforce');

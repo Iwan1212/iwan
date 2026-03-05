@@ -13,6 +13,20 @@ function getToolDefinitions() {
       },
     },
     {
+      name: 'read_channel',
+      description: 'Odczytaj ostatnie wiadomości z bieżącego kanału Slack. Używaj gdy użytkownik prosi o podsumowanie dyskusji, co się działo na kanale, ostatnie ustalenia. Lepsze od search_slack_history gdy chodzi o ostatnie wiadomości a nie konkretną frazę.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          count: {
+            type: 'number',
+            description: 'Ile ostatnich wiadomości pobrać (domyślnie 50, max 100)',
+          },
+        },
+        required: [],
+      },
+    },
+    {
       name: 'search_slack_history',
       description: 'Przeszukaj historię wiadomości Slack w bieżącym kanale. Używaj do pytań o rozmowy, decyzje, ustalenia zespołowe, co ktoś pisał.',
       input_schema: {
