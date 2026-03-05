@@ -40,6 +40,7 @@ app.event('app_mention', async ({ event, say, context }) => {
   // Zamień pozostałe mentions: bota usuń, innych zamień na imię
   const mentionPattern = /<@([A-Z0-9]+)>/g;
   const mentions = [...tekst.matchAll(mentionPattern)];
+  const mentionedUsers = new Map(); // imię → userId (do @mention w odpowiedzi)
   for (const match of mentions) {
     const userId = match[1];
     if (userId === botUserId) {
@@ -47,6 +48,7 @@ app.event('app_mention', async ({ event, say, context }) => {
     } else {
       const name = await getUserName(app, userId);
       tekst = tekst.replace(match[0], name);
+      mentionedUsers.set(name, userId);
     }
   }
   tekst = tekst.trim();
@@ -177,7 +179,14 @@ app.event('app_mention', async ({ event, say, context }) => {
   await saveMessage(event.channel, threadTs, 'iwan', 'assistant', odpowiedz);
 
   // 9. Sformatuj i wyślij odpowiedź (w wątku)
-  const sformatowana = toSlackMarkdown(odpowiedz);
+  let sformatowana = toSlackMarkdown(odpowiedz);
+
+  // Zamień imiona wspomniane w pytaniu na @mention w odpowiedzi
+  for (const [name, userId] of mentionedUsers) {
+    const nameRegex = new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+    sformatowana = sformatowana.replace(nameRegex, `<@${userId}>`);
+  }
+
   await say({ text: sformatowana, thread_ts: threadTs });
 
   // 10. Reakcja ✅ — gotowe, usuń 👀
