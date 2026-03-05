@@ -44,26 +44,37 @@ function createToolExecutors(app, channelId, threadTs) {
 
     read_channel: async ({ count } = {}) => {
       try {
-        const limit = Math.min(count || 50, 100);
-        const result = await app.client.conversations.history({
-          channel: channelId,
-          limit,
-        });
-        const messages = result.messages || [];
-        if (messages.length === 0) return 'Brak wiadomości na kanale.';
+        const target = Math.min(count || 200, 500);
+        const allMessages = [];
+        let cursor;
+
+        // Paginacja — pobierz do target wiadomości
+        while (allMessages.length < target) {
+          const batch = Math.min(200, target - allMessages.length);
+          const result = await app.client.conversations.history({
+            channel: channelId,
+            limit: batch,
+            ...(cursor ? { cursor } : {}),
+          });
+          const msgs = result.messages || [];
+          allMessages.push(...msgs);
+          if (!result.has_more || msgs.length === 0) break;
+          cursor = result.response_metadata?.next_cursor;
+        }
+
+        if (allMessages.length === 0) return 'Brak wiadomości na kanale.';
 
         const lines = [];
-        for (const msg of messages.reverse()) {
-          if (msg.subtype === 'bot_message' && msg.username === 'Iwan') continue;
-          const name = msg.user ? await getUserName(app, msg.user) : 'bot';
+        for (const msg of allMessages.reverse()) {
+          const name = msg.user ? await getUserName(app, msg.user) : (msg.username || 'bot');
           const date = new Date(parseFloat(msg.ts) * 1000).toLocaleString('pl-PL');
           const text = msg.text || '';
           lines.push(`[${date}] ${name}: ${text}`);
         }
         if (lines.length === 0) return 'Brak wiadomości na kanale.';
 
-        const content = lines.join('\n').substring(0, 6000);
-        return `\n\nOSTATNIE WIADOMOŚCI Z KANAŁU:\n---\n${content}\n---\n`;
+        const content = lines.join('\n').substring(0, 8000);
+        return `\n\nOSTATNIE WIADOMOŚCI Z KANAŁU (${lines.length}):\n---\n${content}\n---\n`;
       } catch (error) {
         logError('toolExecutor', 'Błąd odczytu kanału', error.message);
         return 'Nie udało się odczytać kanału.';

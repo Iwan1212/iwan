@@ -66,7 +66,33 @@ app.event('app_mention', async ({ event, say }) => {
   ]);
   const historia = await getHistory(event.channel, threadTs);
   const messages = historia.map(msg => ({ role: msg.role, content: msg.content }));
-  messages.push({ role: 'user', content: tekst });
+
+  // Obsługa obrazków — pobierz i dodaj jako vision content
+  const imageBlocks = [];
+  if (event.files && event.files.length > 0) {
+    for (const file of event.files) {
+      if (file.mimetype && file.mimetype.startsWith('image/')) {
+        try {
+          const res = await fetch(file.url_private, {
+            headers: { 'Authorization': `Bearer ${process.env.SLACK_BOT_TOKEN}` },
+          });
+          const buffer = await res.arrayBuffer();
+          const base64 = Buffer.from(buffer).toString('base64');
+          imageBlocks.push({
+            type: 'image',
+            source: { type: 'base64', media_type: file.mimetype, data: base64 },
+          });
+        } catch (_) {}
+      }
+    }
+  }
+
+  if (imageBlocks.length > 0) {
+    const content = [...imageBlocks, { type: 'text', text: tekst || 'Co widzisz na tym obrazku?' }];
+    messages.push({ role: 'user', content });
+  } else {
+    messages.push({ role: 'user', content: tekst });
+  }
 
   let odpowiedz;
   if (useTools) {

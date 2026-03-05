@@ -20,7 +20,7 @@ function getToolDefinitions() {
         properties: {
           count: {
             type: 'number',
-            description: 'Ile ostatnich wiadomości pobrać (domyślnie 50, max 100)',
+            description: 'Ile ostatnich wiadomości pobrać (domyślnie 200, max 500)',
           },
         },
         required: [],
