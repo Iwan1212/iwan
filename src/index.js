@@ -98,29 +98,30 @@ app.event('app_mention', async ({ event, say }) => {
 
   let odpowiedz;
   try {
-  if (useTools) {
-    // Nowy flow: Claude decyduje które źródła odpytać
-    const executors = createToolExecutors(app, event.channel, threadTs);
-    odpowiedz = await askClaudeWithTools(messages, executors, userName, companyContext);
-  } else {
-    // Legacy flow: wszystkie źródła odpytywane równolegle
-    const [wyniki, notionPages, workforceData] = await Promise.all([
-      searchSlackHistory(tekst, event.channel, threadTs),
-      searchNotion(tekst),
-      searchWorkforce(tekst),
-    ]);
-    await resolveUserNames(app, wyniki);
-    const slackKontekst = buildContextFromMessages(wyniki);
-    const notionKontekst = await buildContextFromNotion(notionPages);
-    const workforceKontekst = buildContextFromWorkforce(workforceData);
-    const kontekst = slackKontekst + notionKontekst + workforceKontekst;
-
-    if (kontekst) {
-      odpowiedz = await askClaudeWithContext(messages, kontekst, userName, companyContext);
-    } else if (messages.length > 1) {
-      odpowiedz = await askClaudeWithHistory(messages, userName, companyContext);
+    if (useTools) {
+      // Nowy flow: Claude decyduje które źródła odpytać
+      const executors = createToolExecutors(app, event.channel, threadTs);
+      odpowiedz = await askClaudeWithTools(messages, executors, userName, companyContext);
     } else {
-      odpowiedz = await askClaude(tekst, userName, companyContext);
+      // Legacy flow: wszystkie źródła odpytywane równolegle
+      const [wyniki, notionPages, workforceData] = await Promise.all([
+        searchSlackHistory(tekst, event.channel, threadTs),
+        searchNotion(tekst),
+        searchWorkforce(tekst),
+      ]);
+      await resolveUserNames(app, wyniki);
+      const slackKontekst = buildContextFromMessages(wyniki);
+      const notionKontekst = await buildContextFromNotion(notionPages);
+      const workforceKontekst = buildContextFromWorkforce(workforceData);
+      const kontekst = slackKontekst + notionKontekst + workforceKontekst;
+
+      if (kontekst) {
+        odpowiedz = await askClaudeWithContext(messages, kontekst, userName, companyContext);
+      } else if (messages.length > 1) {
+        odpowiedz = await askClaudeWithHistory(messages, userName, companyContext);
+      } else {
+        odpowiedz = await askClaude(tekst, userName, companyContext);
+      }
     }
   } catch (error) {
     console.error('[iwan] Błąd Claude API:', error.message);
