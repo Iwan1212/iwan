@@ -30,11 +30,26 @@ const app = new App({
 });
 
 // Obsługa wzmianek @Iwan — z guardrails
-app.event('app_mention', async ({ event, say }) => {
-  const tekst = event.text
-    .replace(/<@[A-Z0-9]+\|([^>]+)>/g, '$1')  // <@U123|Jan> → Jan
-    .replace(/<@[A-Z0-9]+>/g, '')              // <@UBOT> → usuń mention bota
-    .trim();
+app.event('app_mention', async ({ event, say, context }) => {
+  const botUserId = context.botUserId || '';
+
+  // Zamień mentions na imiona: <@U123|Jan> → Jan, <@UBOT> → usuń, <@UINNY> → imię
+  let tekst = event.text
+    .replace(/<@[A-Z0-9]+\|([^>]+)>/g, '$1');  // <@U123|Jan> → Jan
+
+  // Zamień pozostałe mentions: bota usuń, innych zamień na imię
+  const mentionPattern = /<@([A-Z0-9]+)>/g;
+  const mentions = [...tekst.matchAll(mentionPattern)];
+  for (const match of mentions) {
+    const userId = match[1];
+    if (userId === botUserId) {
+      tekst = tekst.replace(match[0], '');
+    } else {
+      const name = await getUserName(app, userId);
+      tekst = tekst.replace(match[0], name);
+    }
+  }
+  tekst = tekst.trim();
 
   // 0. Reakcja 👀 — przetwarzam
   try {
