@@ -67,15 +67,17 @@ app.event('app_mention', async ({ event, say }) => {
   const historia = await getHistory(event.channel, threadTs);
   const messages = historia.map(msg => ({ role: msg.role, content: msg.content }));
 
-  // Obsługa obrazków — pobierz i dodaj jako vision content
+  // Obsługa obrazków — pobierz i dodaj jako vision content (max 5MB)
+  const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
   const imageBlocks = [];
   if (event.files && event.files.length > 0) {
-    for (const file of event.files) {
-      if (file.mimetype && file.mimetype.startsWith('image/')) {
+    for (const file of event.files.slice(0, 3)) {
+      if (file.mimetype && file.mimetype.startsWith('image/') && file.size <= MAX_IMAGE_SIZE) {
         try {
           const res = await fetch(file.url_private, {
             headers: { 'Authorization': `Bearer ${process.env.SLACK_BOT_TOKEN}` },
           });
+          if (!res.ok) continue;
           const buffer = await res.arrayBuffer();
           const base64 = Buffer.from(buffer).toString('base64');
           imageBlocks.push({
@@ -95,6 +97,7 @@ app.event('app_mention', async ({ event, say }) => {
   }
 
   let odpowiedz;
+  try {
   if (useTools) {
     // Nowy flow: Claude decyduje które źródła odpytać
     const executors = createToolExecutors(app, event.channel, threadTs);
@@ -119,6 +122,9 @@ app.event('app_mention', async ({ event, say }) => {
     } else {
       odpowiedz = await askClaude(tekst, userName, companyContext);
     }
+  } catch (error) {
+    console.error('[iwan] Błąd Claude API:', error.message);
+    odpowiedz = 'Przepraszam, coś poszło nie tak. Spróbuj ponownie.';
   }
 
   // 8. Zapisz rozmowę
