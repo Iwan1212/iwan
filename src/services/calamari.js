@@ -61,7 +61,7 @@ function buildContextFromCalamari(absences) {
   }
 
   const content = lines.join('\n').substring(0, 3000);
-  return `\n\nKONTEKST Z CALAMARI (urlopy i nieobecności):\n---\n${content}\n---\n`;
+  return `\n\nKONTEKST Z CALAMARI (urlopy i nieobecności):\nUWAGA: Jeśli danej osoby NIE MA na liście — znaczy że nie ma żadnej zarejestrowanej nieobecności. Nie zgaduj i nie mieszaj danych między osobami.\n---\n${content}\n---\n`;
 }
 
 module.exports = { calamariFetch, getAbsences, buildCalamariDateRange, buildContextFromCalamari };

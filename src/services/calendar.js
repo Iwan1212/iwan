@@ -129,7 +129,8 @@ function buildContextFromCalendar(events) {
   }
 
   const content = lines.join('\n').substring(0, 3000);
-  return `\n\nKONTEKST Z GOOGLE CALENDAR (spotkania i wydarzenia):\n---\n${content}\n---\n`;
+  const calNames = CALENDAR_IDS.map(id => id.split('@')[0]).join(', ');
+  return `\n\nKONTEKST Z GOOGLE CALENDAR (kalendarze: ${calNames}):\nUWAGA: To są TYLKO kalendarze podpiętych osób. Jeśli pytanie dotyczy kogoś innego — te dane NIE dotyczą tej osoby.\n---\n${content}\n---\n`;
 }
 
 // Utwórz nowe wydarzenie w kalendarzu
