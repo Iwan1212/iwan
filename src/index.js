@@ -67,24 +67,29 @@ app.event('app_mention', async ({ event, say }) => {
   const historia = await getHistory(event.channel, threadTs);
   const messages = historia.map(msg => ({ role: msg.role, content: msg.content }));
 
-  // Obsługa obrazków — pobierz i dodaj jako vision content (max 5MB)
-  const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+  // Obsługa obrazków — pobierz i dodaj jako vision content (max 4MB)
+  const MAX_IMAGE_SIZE = 4 * 1024 * 1024;
+  const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
   const imageBlocks = [];
   if (event.files && event.files.length > 0) {
     for (const file of event.files.slice(0, 3)) {
-      if (file.mimetype && file.mimetype.startsWith('image/') && file.size <= MAX_IMAGE_SIZE) {
+      const mimeType = file.mimetype || '';
+      if (ALLOWED_TYPES.includes(mimeType) && (file.size || 0) <= MAX_IMAGE_SIZE) {
         try {
-          const res = await fetch(file.url_private, {
+          const res = await fetch(file.url_private_download || file.url_private, {
             headers: { 'Authorization': `Bearer ${process.env.SLACK_BOT_TOKEN}` },
           });
-          if (!res.ok) continue;
+          if (!res.ok) { console.log(`[iwan] Nie udało się pobrać pliku: ${res.status}`); continue; }
           const buffer = await res.arrayBuffer();
+          console.log(`[iwan] Obrazek: ${file.name}, ${mimeType}, ${buffer.byteLength} bajtów`);
           const base64 = Buffer.from(buffer).toString('base64');
           imageBlocks.push({
             type: 'image',
-            source: { type: 'base64', media_type: file.mimetype, data: base64 },
+            source: { type: 'base64', media_type: mimeType, data: base64 },
           });
-        } catch (_) {}
+        } catch (e) { console.log(`[iwan] Błąd pobierania obrazka: ${e.message}`); }
+      } else if (mimeType.startsWith('image/')) {
+        console.log(`[iwan] Pominięto obrazek: ${file.name}, ${mimeType}, ${file.size} bajtów (za duży lub nieobsługiwany typ)`);
       }
     }
   }
@@ -125,7 +130,19 @@ app.event('app_mention', async ({ event, say }) => {
     }
   } catch (error) {
     console.error('[iwan] Błąd Claude API:', error.message);
-    odpowiedz = 'Przepraszam, coś poszło nie tak. Spróbuj ponownie.';
+    // Retry bez obrazków jeśli to błąd przetwarzania obrazu
+    if (imageBlocks.length > 0 && error.message.includes('image')) {
+      console.log('[iwan] Retry bez obrazków...');
+      messages[messages.length - 1] = { role: 'user', content: tekst || 'Nie udało się przetworzyć obrazka.' };
+      try {
+        const executors = createToolExecutors(app, event.channel, threadTs);
+        odpowiedz = await askClaudeWithTools(messages, executors, userName, companyContext);
+      } catch (e2) {
+        odpowiedz = 'Przepraszam, coś poszło nie tak. Spróbuj ponownie.';
+      }
+    } else {
+      odpowiedz = 'Przepraszam, coś poszło nie tak. Spróbuj ponownie.';
+    }
   }
 
   // 8. Zapisz rozmowę
