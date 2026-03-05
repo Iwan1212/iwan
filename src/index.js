@@ -81,11 +81,23 @@ app.event('app_mention', async ({ event, say }) => {
           });
           if (!res.ok) { console.log(`[iwan] Nie udało się pobrać pliku: ${res.status}`); continue; }
           const buffer = await res.arrayBuffer();
-          console.log(`[iwan] Obrazek: ${file.name}, ${mimeType}, ${buffer.byteLength} bajtów`);
+          const bytes = new Uint8Array(buffer);
+          // Sprawdź magic bytes: PNG (89 50 4E 47), JPEG (FF D8 FF), GIF (47 49 46), WEBP (52 49 46 46)
+          const isPng = bytes[0] === 0x89 && bytes[1] === 0x50;
+          const isJpeg = bytes[0] === 0xFF && bytes[1] === 0xD8;
+          const isGif = bytes[0] === 0x47 && bytes[1] === 0x49;
+          const isWebp = bytes[0] === 0x52 && bytes[1] === 0x49;
+          if (!isPng && !isJpeg && !isGif && !isWebp) {
+            console.log(`[iwan] Plik ${file.name} nie jest obrazkiem (magic: ${bytes[0]?.toString(16)} ${bytes[1]?.toString(16)})`);
+            continue;
+          }
+          // Użyj faktycznego typu na podstawie magic bytes
+          const detectedType = isPng ? 'image/png' : isJpeg ? 'image/jpeg' : isGif ? 'image/gif' : 'image/webp';
+          console.log(`[iwan] Obrazek: ${file.name}, ${detectedType}, ${buffer.byteLength} bajtów`);
           const base64 = Buffer.from(buffer).toString('base64');
           imageBlocks.push({
             type: 'image',
-            source: { type: 'base64', media_type: mimeType, data: base64 },
+            source: { type: 'base64', media_type: detectedType, data: base64 },
           });
         } catch (e) { console.log(`[iwan] Błąd pobierania obrazka: ${e.message}`); }
       } else if (mimeType.startsWith('image/')) {
