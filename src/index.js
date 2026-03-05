@@ -215,6 +215,11 @@ setupWeeklySummary(app);
 // Start bota
 (async () => {
   await app.start();
+
+  // Włącz tryb proaktywny (po starcie, bo potrzebuje API)
+  const { setupProactive } = require('./proactive/setup');
+  await setupProactive(app);
+
   console.log('🤖 Iwan działa w Socket Mode!');
 })();
 

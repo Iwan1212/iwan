@@ -2,6 +2,7 @@
 const { saveSlackMessage } = require('./saveMessage');
 const { getUserName } = require('../services/users');
 const { getChannelName } = require('../services/channels');
+const { isProactiveEnabled } = require('../proactive/config');
 
 // Nasłuchuj WSZYSTKICH wiadomości w kanałach (nie tylko wzmianki)
 function setupCrawler(app) {
@@ -14,6 +15,12 @@ function setupCrawler(app) {
     const userName = await getUserName(app, message.user);
     const channelName = await getChannelName(app, message.channel);
     await saveSlackMessage({ ...message, user_name: userName, channel_name: channelName });
+
+    // Hook proaktywny — fire-and-forget
+    if (isProactiveEnabled()) {
+      const { evaluateMessage } = require('../proactive/engine');
+      evaluateMessage(app, message, channelName).catch(() => {});
+    }
   });
   console.log('📡 Crawler Slack aktywny — zapisuję wiadomości z kanałów');
 }
