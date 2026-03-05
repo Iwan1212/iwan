@@ -10,21 +10,38 @@ async function resolveProactiveChannels(app) {
   if (names.length === 0) return;
 
   try {
-    const result = await app.client.conversations.list({
-      types: 'public_channel,private_channel',
-      limit: 1000,
-    });
-
-    const allChannels = result.channels || [];
     const nameSet = new Set(names);
+    let cursor;
+    let totalFetched = 0;
 
-    for (const ch of allChannels) {
-      if (nameSet.has(ch.name)) {
-        channelMap.set(ch.name, ch.id);
+    // Paginacja — conversations.list może nie zwrócić wszystkich w jednym batchu
+    do {
+      const result = await app.client.conversations.list({
+        types: 'public_channel,private_channel',
+        exclude_archived: true,
+        limit: 1000,
+        ...(cursor ? { cursor } : {}),
+      });
+
+      const batch = result.channels || [];
+      totalFetched += batch.length;
+
+      for (const ch of batch) {
+        if (nameSet.has(ch.name)) {
+          channelMap.set(ch.name, ch.id);
+        }
       }
-    }
 
-    console.log(`[proactive] Resolved ${channelMap.size}/${names.length} kanałów: ${[...channelMap.keys()].join(', ')}`);
+      cursor = result.response_metadata?.next_cursor;
+    } while (cursor && channelMap.size < names.length);
+
+    console.log(`[proactive] Resolved ${channelMap.size}/${names.length} kanałów (przeszukano ${totalFetched}): ${[...channelMap.entries()].map(([n, id]) => `${n}=${id}`).join(', ')}`);
+
+    // Loguj brakujące kanały
+    const missing = names.filter(n => !channelMap.has(n));
+    if (missing.length > 0) {
+      console.log(`[proactive] Nie znaleziono kanałów: ${missing.join(', ')} — sprawdź czy bot jest memberem`);
+    }
   } catch (error) {
     console.error('[proactive] Błąd resolving kanałów:', error.message);
   }
