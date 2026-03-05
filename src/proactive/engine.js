@@ -84,8 +84,8 @@ async function evaluateMessage(app, message, channelName) {
   const triggerReason = triggers.join(', ');
   console.log(`[proactive] Trigger: ${triggerReason} na #${channelName}`);
 
-  // 4. Zapobiegaj race conditions
-  const lockKey = message.thread_ts ? `${channelId}:${message.thread_ts}` : `channel:${channelId}`;
+  // 4. Zapobiegaj race conditions (parent i replies mają ten sam lock)
+  const lockKey = `${channelId}:${message.thread_ts || message.ts}`;
   if (inProgress.has(lockKey)) return;
   inProgress.add(lockKey);
 
@@ -108,16 +108,15 @@ async function evaluateMessage(app, message, channelName) {
       return;
     }
 
-    // 8. Wygeneruj i wyślij odpowiedź
+    // 8. Wygeneruj i wyślij odpowiedź (ZAWSZE w wątku — message.ts jako fallback)
     const companyContext = await getCompanyContext(message.text);
-    const threadTs = message.thread_ts || null;
+    const threadTs = message.thread_ts || message.ts;
     await sendProactiveResponse(app, channelId, threadTs, conversationText, triggerReason, companyContext);
 
-    // 9. Zaznacz jako obsłużone
+    // 9. Zaznacz jako obsłużone — zarówno wątek jak i kanał
     recordProactiveResponse();
-    if (message.thread_ts) {
-      markThreadResponded(channelId, message.thread_ts);
-    } else {
+    markThreadResponded(channelId, threadTs);
+    if (!message.thread_ts) {
       markChannelResponded(channelId);
     }
   } catch (error) {
