@@ -18,6 +18,7 @@ describe('buildToolSystemPrompt', () => {
     const prompt = buildToolSystemPrompt('Jan', '');
     expect(prompt).toContain('Jan');
     expect(prompt).toContain('narzędzi');
+    expect(prompt).toContain('Momentum');
   });
 
   it('dołącza companyContext', () => {
