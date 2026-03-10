@@ -107,6 +107,7 @@ function createToolExecutors(app, channelId, threadTs) {
     search_calendar: async ({ query }) => {
       const { startDate, endDate } = buildCalendarDateRange(query);
       const events = await getEvents(startDate, endDate);
+      console.log(`[calendar] Query: "${query}" → ${startDate} - ${endDate} → ${events.length} wydarzeń`);
       return buildContextFromCalendar(events);
     },
 

@@ -1,8 +1,6 @@
 // Testy serwisu Google Calendar
 jest.mock('../src/services/errors', () => ({ logError: jest.fn() }));
-jest.mock('../src/services/workforce', () => ({
-  buildDateRange: jest.fn().mockReturnValue({ startDate: '2026-03-01', endDate: '2026-03-31' }),
-}));
+// workforce nie jest już potrzebny w calendar.js — nie mockujemy
 
 // Mock googleapis przed importem
 const mockEventsList = jest.fn();
@@ -220,27 +218,35 @@ describe('parseCalendarDate', () => {
     expect(end.getDay()).toBe(0); // Sunday
   });
 
-  it('"spotkania w marcu" → null (fallback)', () => {
+  it('"spotkania w marcu" → cały marzec (od dziś)', () => {
     const result = parseCalendarDate('spotkania w marcu');
-    expect(result).toBeNull();
+    expect(result.endDate).toBe('2026-03-31');
+    expect(result.startDate <= '2026-03-31').toBe(true);
+  });
+
+  it('"Q2" → kwiecień-czerwiec', () => {
+    const result = parseCalendarDate('spotkania w Q2');
+    expect(result.endDate).toBe('2026-06-30');
+    expect(result.startDate).toMatch(/^2026-04/);
+  });
+
+  it('brak daty → domyślnie 3 tygodnie od dziś', () => {
+    const result = parseCalendarDate('kiedy mam spotkanie leadershipowe');
+    const start = new Date(result.startDate + 'T12:00:00');
+    const end = new Date(result.endDate + 'T12:00:00');
+    const diffDays = Math.round((end - start) / (24 * 60 * 60 * 1000));
+    expect(diffDays).toBe(21);
   });
 });
 
 describe('buildCalendarDateRange', () => {
-  it('deleguje do buildDateRange z workforce i ogranicza startDate do dziś', () => {
-    const { buildDateRange } = require('../src/services/workforce');
+  it('"spotkania w marcu" → cały marzec (standalone, bez workforce)', () => {
     const result = buildCalendarDateRange('spotkania w marcu');
-    expect(buildDateRange).toHaveBeenCalledWith('spotkania w marcu');
-    const today = new Date().toISOString().split('T')[0];
-    expect(result.startDate).toBe(today);
     expect(result.endDate).toBe('2026-03-31');
   });
 
-  it('"jutro" → nie woła workforce.buildDateRange', () => {
-    const { buildDateRange } = require('../src/services/workforce');
-    buildDateRange.mockClear();
+  it('"jutro" → single day', () => {
     const result = buildCalendarDateRange('co mam jutro');
-    expect(buildDateRange).not.toHaveBeenCalled();
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     const y = tomorrow.getFullYear();

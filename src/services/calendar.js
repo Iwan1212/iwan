@@ -93,6 +93,22 @@ function formatEventTime(start, end) {
   return `${fmt(start)}-${fmt(end)}`;
 }
 
+// Polskie nazwy miesięcy → numer (do parsowania "w marcu", "w Q2")
+const MONTH_NAMES_MAP = {
+  'styczeń': 1, 'styczniu': 1, 'styczen': 1, 'stycznia': 1,
+  'luty': 2, 'lutym': 2, 'lutego': 2,
+  'marzec': 3, 'marcu': 3, 'marca': 3,
+  'kwiecień': 4, 'kwietniu': 4, 'kwiecien': 4, 'kwietnia': 4,
+  'maj': 5, 'maju': 5, 'maja': 5,
+  'czerwiec': 6, 'czerwcu': 6, 'czerwca': 6,
+  'lipiec': 7, 'lipcu': 7, 'lipca': 7,
+  'sierpień': 8, 'sierpniu': 8, 'sierpien': 8, 'sierpnia': 8,
+  'wrzesień': 9, 'wrześniu': 9, 'wrzesien': 9, 'września': 9,
+  'październik': 10, 'październiku': 10, 'pazdziernik': 10, 'października': 10,
+  'listopad': 11, 'listopadzie': 11, 'listopada': 11,
+  'grudzień': 12, 'grudniu': 12, 'grudzien': 12, 'grudnia': 12,
+};
+
 // Mapa polskich nazw dni tygodnia → getDay() (0=niedziela)
 const DAY_NAMES_MAP = {
   'poniedziałek': 1, 'poniedzialek': 1,
@@ -216,20 +232,41 @@ function parseCalendarDate(text) {
     }
   }
 
-  // Brak dopasowania → null (fallback do workforce)
-  return null;
+  // Kwartał: "Q1", "Q2", ...
+  const qMatch = lower.match(/q(\d)/);
+  if (qMatch) {
+    const q = parseInt(qMatch[1]);
+    const year = today.getFullYear();
+    const startMonth = (q - 1) * 3 + 1;
+    const endMonth = startMonth + 2;
+    const startDate = `${year}-${String(startMonth).padStart(2, '0')}-01`;
+    const lastDay = new Date(year, endMonth, 0).getDate();
+    const endDate = `${year}-${String(endMonth).padStart(2, '0')}-${lastDay}`;
+    const todayStr = toDateStr(today);
+    return { startDate: startDate < todayStr ? todayStr : startDate, endDate };
+  }
+
+  // Nazwa miesiąca: "w marcu", "spotkania w kwietniu"
+  for (const [name, monthNum] of Object.entries(MONTH_NAMES_MAP)) {
+    if (lower.includes(name)) {
+      const year = today.getFullYear();
+      const startDate = `${year}-${String(monthNum).padStart(2, '0')}-01`;
+      const lastDay = new Date(year, monthNum, 0).getDate();
+      const endDate = `${year}-${String(monthNum).padStart(2, '0')}-${lastDay}`;
+      const todayStr = toDateStr(today);
+      return { startDate: startDate < todayStr ? todayStr : startDate, endDate };
+    }
+  }
+
+  // Brak dopasowania → domyślnie 3 tygodnie od dziś
+  const end = new Date(today);
+  end.setDate(end.getDate() + 21);
+  return { startDate: toDateStr(today), endDate: toDateStr(end) };
 }
 
-// Reużyj buildDateRange z workforce.js, ale najpierw spróbuj parseCalendarDate
+// Zbuduj zakres dat dla kalendarza — standalone, bez zależności od workforce
 function buildCalendarDateRange(query) {
-  const smart = parseCalendarDate(query);
-  if (smart) return smart;
-
-  const { buildDateRange } = require('./workforce');
-  const range = buildDateRange(query);
-  const today = new Date().toISOString().split('T')[0];
-  if (range.startDate < today) range.startDate = today;
-  return range;
+  return parseCalendarDate(query);
 }
 
 // Zbuduj kontekst z wydarzeń dla Claude
