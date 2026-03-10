@@ -1,5 +1,6 @@
 // src/services/claude.js
 const Anthropic = require('@anthropic-ai/sdk');
+const { MODEL_SONNET } = require('./models');
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -55,7 +56,7 @@ ZASADY:
 // Wyślij wiadomość do Claude i zwróć odpowiedź
 async function askClaude(userMessage, userName, companyContext = '') {
   const response = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: MODEL_SONNET,
     max_tokens: 1024,
     system: buildSystemPrompt(userName, companyContext),
     messages: [{ role: 'user', content: userMessage }],
@@ -66,7 +67,7 @@ async function askClaude(userMessage, userName, companyContext = '') {
 // Wyślij wiadomość do Claude z historią rozmowy
 async function askClaudeWithHistory(messages, userName, companyContext = '') {
   const response = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: MODEL_SONNET,
     max_tokens: 1024,
     system: buildSystemPrompt(userName, companyContext),
     messages: messages,
@@ -78,7 +79,7 @@ async function askClaudeWithHistory(messages, userName, companyContext = '') {
 async function askClaudeWithContext(messages, slackContext, userName, companyContext = '') {
   const systemWithContext = buildSystemPrompt(userName, companyContext) + slackContext;
   const response = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: MODEL_SONNET,
     max_tokens: 1024,
     system: systemWithContext,
     messages: messages,

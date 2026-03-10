@@ -1,4 +1,4 @@
-// Testy Claude z pętlą tool use
+// Testy Claude z pętlą tool use i prompt caching
 jest.mock('../src/services/supabase', () => ({ supabase: {} }));
 jest.mock('../src/services/errors', () => ({ logError: jest.fn() }));
 jest.mock('@anthropic-ai/sdk', () => {
@@ -9,24 +9,9 @@ jest.mock('@anthropic-ai/sdk', () => {
 });
 
 const Anthropic = require('@anthropic-ai/sdk');
-const { askClaudeWithTools, buildToolSystemPrompt, extractText } = require('../src/services/claudeTools');
+const { askClaudeWithTools, extractText } = require('../src/services/claudeTools');
 
 const getCreateMock = () => new Anthropic().messages.create;
-
-describe('buildToolSystemPrompt', () => {
-  it('zawiera userName i instrukcję o narzędziach', () => {
-    const prompt = buildToolSystemPrompt('Jan', '');
-    expect(prompt).toContain('Jan');
-    expect(prompt).toContain('narzędzi');
-    expect(prompt).toContain('Momentum');
-  });
-
-  it('dołącza companyContext', () => {
-    const ctx = '\n\nINFORMACJE O FIRMIE:\n[firma]: Momentum';
-    const prompt = buildToolSystemPrompt('Jan', ctx);
-    expect(prompt).toContain('INFORMACJE O FIRMIE');
-  });
-});
 
 describe('extractText', () => {
   it('wyciąga tekst z text bloków', () => {
@@ -130,7 +115,7 @@ describe('askClaudeWithTools', () => {
     expect(lastCall).not.toHaveProperty('tools');
   });
 
-  it('przekazuje tools w wywołaniu API', async () => {
+  it('przekazuje tools z cache_control w wywołaniu API', async () => {
     getCreateMock().mockResolvedValue({
       stop_reason: 'end_turn',
       content: [{ type: 'text', text: 'OK' }],
@@ -145,5 +130,44 @@ describe('askClaudeWithTools', () => {
     const callArgs = getCreateMock().mock.calls[0][0];
     expect(callArgs).toHaveProperty('tools');
     expect(callArgs.tools).toHaveLength(8);
+    // Ostatnie narzędzie ma cache_control
+    const lastTool = callArgs.tools[callArgs.tools.length - 1];
+    expect(lastTool.cache_control).toEqual({ type: 'ephemeral' });
+  });
+
+  it('system prompt jest tablicą z cache_control', async () => {
+    getCreateMock().mockResolvedValue({
+      stop_reason: 'end_turn',
+      content: [{ type: 'text', text: 'OK' }],
+    });
+
+    await askClaudeWithTools(
+      [{ role: 'user', content: 'test' }],
+      {},
+      'Jan',
+    );
+
+    const callArgs = getCreateMock().mock.calls[0][0];
+    expect(Array.isArray(callArgs.system)).toBe(true);
+    expect(callArgs.system).toHaveLength(2);
+    expect(callArgs.system[0].cache_control).toEqual({ type: 'ephemeral' });
+    expect(callArgs.system[1].cache_control).toBeUndefined();
+  });
+
+  it('używa modelu Sonnet 4.5', async () => {
+    getCreateMock().mockResolvedValue({
+      stop_reason: 'end_turn',
+      content: [{ type: 'text', text: 'OK' }],
+    });
+
+    await askClaudeWithTools(
+      [{ role: 'user', content: 'test' }],
+      {},
+      'Jan',
+    );
+
+    const callArgs = getCreateMock().mock.calls[0][0];
+    expect(callArgs.model).toContain('sonnet');
+    expect(callArgs.model).toBe('claude-sonnet-4-5-20250929');
   });
 });

@@ -1,12 +1,13 @@
 // src/services/classify.js
 const Anthropic = require('@anthropic-ai/sdk');
+const { MODEL_HAIKU } = require('./models');
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // Klasyfikuj wiadomość użytkownika (haiku — tani i szybki)
 async function classifyMessage(text) {
   const response = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
+    model: MODEL_HAIKU,
     max_tokens: 50,
     messages: [{
       role: 'user',

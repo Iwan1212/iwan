@@ -6,6 +6,7 @@ const { searchSlackHistory, buildContextFromMessages } = require('./services/sea
 const { searchNotion, buildContextFromNotion } = require('./services/notion');
 const { searchWorkforce, buildContextFromWorkforce, shouldQueryWorkforce } = require('./services/workforce');
 const { askClaudeWithTools } = require('./services/claudeTools');
+const { askHaiku } = require('./services/claudeHaiku');
 const { createToolExecutors } = require('./services/toolExecutor');
 
 const useTools = process.env.ENABLE_TOOL_USE === 'true';
@@ -66,15 +67,41 @@ app.event('app_mention', async ({ event, say, context }) => {
   const limit = checkRateLimit(event.user);
   if (!limit.allowed) { await say(limit.error); return; }
 
-  // 3. Klasyfikacja (pomiń dla zapytań workforce — krótkie frazy typu "team backend" mogą być błędnie klasyfikowane)
   // 3. Klasyfikacja (pomiń dla zapytań workforce — krótkie frazy mogą być błędnie klasyfikowane)
+  let kategoria = null;
   if (!shouldQueryWorkforce(tekst)) {
-    const kategoria = await classifyMessage(tekst);
+    kategoria = await classifyMessage(tekst);
     if (kategoria === 'spam') { await say('Nie mogę pomóc z tym zapytaniem.'); return; }
   }
 
   // 4. Thread ID — event.thread_ts dla odpowiedzi w wątku, event.ts dla nowych wiadomości
   const threadTs = event.thread_ts || event.ts;
+
+  // 4.5. Smart routing: small-talk bez obrazków → szybka odpowiedź Haiku
+  const hasImages = event.files && event.files.some(f => (f.mimetype || '').startsWith('image/'));
+  if (kategoria === 'small-talk' && !hasImages) {
+    const userName = await getUserName(app, event.user);
+    let odpowiedz;
+    try {
+      odpowiedz = await askHaiku([{ role: 'user', content: tekst }], userName);
+    } catch (error) {
+      console.error('[iwan] Błąd Haiku:', error.message);
+      odpowiedz = 'Stay hard! 💪';
+    }
+    await saveMessage(event.channel, threadTs, event.user, 'user', tekst);
+    await saveMessage(event.channel, threadTs, 'iwan', 'assistant', odpowiedz);
+    let sformatowana = toSlackMarkdown(odpowiedz);
+    for (const [name, userId] of mentionedUsers) {
+      const nameRegex = new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+      sformatowana = sformatowana.replace(nameRegex, `<@${userId}>`);
+    }
+    await say({ text: sformatowana, thread_ts: threadTs });
+    try {
+      await app.client.reactions.remove({ channel: event.channel, name: 'eyes', timestamp: event.ts });
+      await app.client.reactions.add({ channel: event.channel, name: 'white_check_mark', timestamp: event.ts });
+    } catch (_) {}
+    return;
+  }
 
   // 5-7. Dwa tryby: tool use (Claude decyduje co odpytać) lub legacy (wszystko na raz)
   const [userName, companyContext] = await Promise.all([

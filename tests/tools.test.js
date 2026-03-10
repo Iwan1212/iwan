@@ -1,5 +1,5 @@
 // Testy definicji narzędzi dla Claude tool use
-const { getToolDefinitions } = require('../src/services/tools');
+const { getToolDefinitions, getToolDefinitionsWithCache } = require('../src/services/tools');
 
 describe('getToolDefinitions', () => {
   it('zwraca tablicę 7 narzędzi', () => {
@@ -49,5 +49,41 @@ describe('getToolDefinitions', () => {
     expect(createEvent.input_schema.required).toEqual(['title', 'start_datetime', 'end_datetime']);
     expect(createEvent.input_schema.properties).toHaveProperty('attendees');
     expect(createEvent.input_schema.properties).toHaveProperty('description');
+  });
+});
+
+describe('getToolDefinitionsWithCache', () => {
+  it('zwraca tablicę 8 narzędzi', () => {
+    const tools = getToolDefinitionsWithCache();
+    expect(Array.isArray(tools)).toBe(true);
+    expect(tools).toHaveLength(8);
+  });
+
+  it('ostatnie narzędzie ma cache_control', () => {
+    const tools = getToolDefinitionsWithCache();
+    const last = tools[tools.length - 1];
+    expect(last.cache_control).toEqual({ type: 'ephemeral' });
+  });
+
+  it('pozostałe narzędzia nie mają cache_control', () => {
+    const tools = getToolDefinitionsWithCache();
+    for (const tool of tools.slice(0, -1)) {
+      expect(tool.cache_control).toBeUndefined();
+    }
+  });
+
+  it('nie modyfikuje oryginalnych definicji', () => {
+    getToolDefinitionsWithCache();
+    const original = getToolDefinitions();
+    const last = original[original.length - 1];
+    expect(last.cache_control).toBeUndefined();
+  });
+
+  it('zachowuje wszystkie pola ostatniego narzędzia', () => {
+    const tools = getToolDefinitionsWithCache();
+    const last = tools[tools.length - 1];
+    expect(last).toHaveProperty('name', 'create_event');
+    expect(last).toHaveProperty('description');
+    expect(last).toHaveProperty('input_schema');
   });
 });

@@ -130,4 +130,11 @@ function getToolDefinitions() {
   ];
 }
 
-module.exports = { getToolDefinitions };
+// Zwróć definicje narzędzi z cache_control na ostatnim narzędziu (prompt caching)
+function getToolDefinitionsWithCache() {
+  const tools = getToolDefinitions();
+  const last = { ...tools[tools.length - 1], cache_control: { type: 'ephemeral' } };
+  return [...tools.slice(0, -1), last];
+}
+
+module.exports = { getToolDefinitions, getToolDefinitionsWithCache };

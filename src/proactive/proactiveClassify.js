@@ -1,5 +1,6 @@
 // src/proactive/proactiveClassify.js — Haiku gatekeeper: czy Iwan powinien się odezwać?
 const Anthropic = require('@anthropic-ai/sdk');
+const { MODEL_HAIKU } = require('../services/models');
 const { getProactiveConfig } = require('./config');
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -7,7 +8,7 @@ const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 // Zapytaj Haiku czy Iwan powinien się odezwać
 async function shouldIwanRespond(conversationText, triggerReason) {
   const response = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
+    model: MODEL_HAIKU,
     max_tokens: 100,
     messages: [{
       role: 'user',

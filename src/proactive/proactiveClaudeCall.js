@@ -1,6 +1,7 @@
-// src/proactive/proactiveClaudeCall.js — Sonnet z tools (proaktywna wersja)
+// src/proactive/proactiveClaudeCall.js — Sonnet z tools i prompt caching (proaktywna wersja)
 const Anthropic = require('@anthropic-ai/sdk');
-const { getToolDefinitions } = require('../services/tools');
+const { MODEL_SONNET } = require('../services/models');
+const { getToolDefinitionsWithCache } = require('../services/tools');
 const { executeToolCalls, MAX_TOOL_ROUNDS } = require('../services/toolExecutor');
 const { buildProactiveSystemPrompt } = require('./proactivePrompt');
 
@@ -13,13 +14,13 @@ function extractText(response) {
 
 // Wyślij wiadomość do Claude w trybie proaktywnym (max 512 tokenów)
 async function askClaudeProactive(messages, executors, companyContext = '') {
-  const tools = getToolDefinitions();
+  const tools = getToolDefinitionsWithCache();
   const systemPrompt = buildProactiveSystemPrompt(companyContext);
   let currentMessages = [...messages];
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: MODEL_SONNET,
       max_tokens: 512,
       system: systemPrompt,
       tools,
@@ -37,7 +38,7 @@ async function askClaudeProactive(messages, executors, companyContext = '') {
 
   // Safety: finalne wywołanie bez tools
   const finalResponse = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: MODEL_SONNET,
     max_tokens: 512,
     system: systemPrompt,
     messages: currentMessages,
