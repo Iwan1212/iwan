@@ -30,6 +30,22 @@ const app = new App({
   socketMode: true,
 });
 
+// Helper: zapisz, sformatuj, wyślij odpowiedź i zmień reakcje
+async function sendReply({ app, event, threadTs, tekst, odpowiedz, mentionedUsers, say }) {
+  await saveMessage(event.channel, threadTs, event.user, 'user', tekst);
+  await saveMessage(event.channel, threadTs, 'iwan', 'assistant', odpowiedz);
+  let sformatowana = toSlackMarkdown(odpowiedz);
+  for (const [name, userId] of mentionedUsers) {
+    const nameRegex = new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+    sformatowana = sformatowana.replace(nameRegex, `<@${userId}>`);
+  }
+  await say({ text: sformatowana, thread_ts: threadTs });
+  try {
+    await app.client.reactions.remove({ channel: event.channel, name: 'eyes', timestamp: event.ts });
+    await app.client.reactions.add({ channel: event.channel, name: 'white_check_mark', timestamp: event.ts });
+  } catch (_) {}
+}
+
 // Obsługa wzmianek @Iwan — z guardrails
 app.event('app_mention', async ({ event, say, context }) => {
   const botUserId = context.botUserId || '';
@@ -88,18 +104,7 @@ app.event('app_mention', async ({ event, say, context }) => {
       console.error('[iwan] Błąd Haiku:', error.message);
       odpowiedz = 'Stay hard! 💪';
     }
-    await saveMessage(event.channel, threadTs, event.user, 'user', tekst);
-    await saveMessage(event.channel, threadTs, 'iwan', 'assistant', odpowiedz);
-    let sformatowana = toSlackMarkdown(odpowiedz);
-    for (const [name, userId] of mentionedUsers) {
-      const nameRegex = new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
-      sformatowana = sformatowana.replace(nameRegex, `<@${userId}>`);
-    }
-    await say({ text: sformatowana, thread_ts: threadTs });
-    try {
-      await app.client.reactions.remove({ channel: event.channel, name: 'eyes', timestamp: event.ts });
-      await app.client.reactions.add({ channel: event.channel, name: 'white_check_mark', timestamp: event.ts });
-    } catch (_) {}
+    await sendReply({ app, event, threadTs, tekst, odpowiedz, mentionedUsers, say });
     return;
   }
 
@@ -201,26 +206,8 @@ app.event('app_mention', async ({ event, say, context }) => {
     }
   }
 
-  // 8. Zapisz rozmowę
-  await saveMessage(event.channel, threadTs, event.user, 'user', tekst);
-  await saveMessage(event.channel, threadTs, 'iwan', 'assistant', odpowiedz);
-
-  // 9. Sformatuj i wyślij odpowiedź (w wątku)
-  let sformatowana = toSlackMarkdown(odpowiedz);
-
-  // Zamień imiona wspomniane w pytaniu na @mention w odpowiedzi
-  for (const [name, userId] of mentionedUsers) {
-    const nameRegex = new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
-    sformatowana = sformatowana.replace(nameRegex, `<@${userId}>`);
-  }
-
-  await say({ text: sformatowana, thread_ts: threadTs });
-
-  // 10. Reakcja ✅ — gotowe, usuń 👀
-  try {
-    await app.client.reactions.remove({ channel: event.channel, name: 'eyes', timestamp: event.ts });
-    await app.client.reactions.add({ channel: event.channel, name: 'white_check_mark', timestamp: event.ts });
-  } catch (_) {}
+  // 8-10. Zapisz, sformatuj, wyślij odpowiedź i zmień reakcje
+  await sendReply({ app, event, threadTs, tekst, odpowiedz, mentionedUsers, say });
 });
 
 // Włącz slash command /iwan

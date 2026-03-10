@@ -36,6 +36,7 @@ const {
   normalizeEvent,
   formatEventTime,
   getEvents,
+  parseCalendarDate,
   buildCalendarDateRange,
   buildContextFromCalendar,
   createCalendarEvent,
@@ -142,6 +143,89 @@ describe('getEvents', () => {
   });
 });
 
+describe('parseCalendarDate', () => {
+  const toDateStr = (d) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${dd}`;
+  };
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  it('"dziś" → today', () => {
+    const result = parseCalendarDate('co mam dziś?');
+    expect(result.startDate).toBe(toDateStr(today));
+    expect(result.endDate).toBe(toDateStr(today));
+  });
+
+  it('"dzisiaj" → today', () => {
+    const result = parseCalendarDate('spotkania dzisiaj');
+    expect(result.startDate).toBe(toDateStr(today));
+  });
+
+  it('"jutro" → tomorrow', () => {
+    const t = new Date(today);
+    t.setDate(t.getDate() + 1);
+    const result = parseCalendarDate('spotkania jutro');
+    expect(result.startDate).toBe(toDateStr(t));
+    expect(result.endDate).toBe(toDateStr(t));
+  });
+
+  it('"pojutrze" → today+2', () => {
+    const t = new Date(today);
+    t.setDate(t.getDate() + 2);
+    const result = parseCalendarDate('co jest pojutrze?');
+    expect(result.startDate).toBe(toDateStr(t));
+  });
+
+  it('"środa" → nearest Wednesday', () => {
+    const result = parseCalendarDate('spotkanie w środę');
+    const d = new Date(result.startDate + 'T00:00:00');
+    expect(d.getDay()).toBe(3); // Wednesday
+    expect(d >= today).toBe(true);
+  });
+
+  it('"przyszłą środę" → Wednesday next week', () => {
+    const result = parseCalendarDate('przyszłą środę');
+    const d = new Date(result.startDate + 'T12:00:00');
+    expect(d.getDay()).toBe(3);
+    // must be at least 7 days from now (next week)
+    const weekFromNow = new Date(today);
+    weekFromNow.setDate(weekFromNow.getDate() + 6);
+    expect(result.startDate > toDateStr(today)).toBe(true);
+  });
+
+  it('"przyszły tydzień" → Mon–Sun next week', () => {
+    const result = parseCalendarDate('w przyszłym tygodniu');
+    const start = new Date(result.startDate + 'T00:00:00');
+    const end = new Date(result.endDate + 'T00:00:00');
+    expect(start.getDay()).toBe(1); // Monday
+    expect(end.getDay()).toBe(0); // Sunday
+    expect(end - start).toBe(6 * 24 * 60 * 60 * 1000);
+  });
+
+  it('"w przyszłym tygodniu w środę" → specific day next week', () => {
+    const result = parseCalendarDate('w przyszłym tygodniu w środę');
+    const d = new Date(result.startDate + 'T00:00:00');
+    expect(d.getDay()).toBe(3);
+    expect(result.startDate).toBe(result.endDate);
+  });
+
+  it('"ten tydzień" → Mon–Sun this week', () => {
+    const result = parseCalendarDate('spotkania w tym tygodniu');
+    const start = new Date(result.startDate + 'T00:00:00');
+    const end = new Date(result.endDate + 'T00:00:00');
+    expect(start.getDay()).toBe(1); // Monday
+    expect(end.getDay()).toBe(0); // Sunday
+  });
+
+  it('"spotkania w marcu" → null (fallback)', () => {
+    const result = parseCalendarDate('spotkania w marcu');
+    expect(result).toBeNull();
+  });
+});
+
 describe('buildCalendarDateRange', () => {
   it('deleguje do buildDateRange z workforce i ogranicza startDate do dziś', () => {
     const { buildDateRange } = require('../src/services/workforce');
@@ -150,6 +234,19 @@ describe('buildCalendarDateRange', () => {
     const today = new Date().toISOString().split('T')[0];
     expect(result.startDate).toBe(today);
     expect(result.endDate).toBe('2026-03-31');
+  });
+
+  it('"jutro" → nie woła workforce.buildDateRange', () => {
+    const { buildDateRange } = require('../src/services/workforce');
+    buildDateRange.mockClear();
+    const result = buildCalendarDateRange('co mam jutro');
+    expect(buildDateRange).not.toHaveBeenCalled();
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const y = tomorrow.getFullYear();
+    const m = String(tomorrow.getMonth() + 1).padStart(2, '0');
+    const d = String(tomorrow.getDate()).padStart(2, '0');
+    expect(result.startDate).toBe(`${y}-${m}-${d}`);
   });
 });
 

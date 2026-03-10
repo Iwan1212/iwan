@@ -3,14 +3,10 @@ const Anthropic = require('@anthropic-ai/sdk');
 const { MODEL_SONNET } = require('../services/models');
 const { getToolDefinitionsWithCache } = require('../services/tools');
 const { executeToolCalls, MAX_TOOL_ROUNDS } = require('../services/toolExecutor');
+const { extractText } = require('../services/claudeTools');
 const { buildProactiveSystemPrompt } = require('./proactivePrompt');
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-// Wyciągnij tekst z odpowiedzi Claude
-function extractText(response) {
-  return response.content.filter(b => b.type === 'text').map(b => b.text).join('');
-}
 
 // Wyślij wiadomość do Claude w trybie proaktywnym (max 512 tokenów)
 async function askClaudeProactive(messages, executors, companyContext = '') {

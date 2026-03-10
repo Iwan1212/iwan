@@ -54,34 +54,22 @@ function buildDynamicBlock(userName, companyContext) {
   return `\n- Dzisiejsza data: ${today}.\n- Aktualnie rozmawia z Tobą: ${userName}.${companyContext}`;
 }
 
+// Helper: zbuduj 2-blokową strukturę z cache_control
+function buildCachedBlocks(staticText, userName, companyContext) {
+  return [
+    { type: 'text', text: staticText, cache_control: { type: 'ephemeral' } },
+    { type: 'text', text: buildDynamicBlock(userName, companyContext) },
+  ];
+}
+
 // Zbuduj system prompt z cache_control (wersja podstawowa, bez narzędzi)
 function buildCachedSystemPrompt(userName, companyContext) {
-  return [
-    {
-      type: 'text',
-      text: STATIC_SYSTEM_PROMPT,
-      cache_control: { type: 'ephemeral' },
-    },
-    {
-      type: 'text',
-      text: buildDynamicBlock(userName, companyContext),
-    },
-  ];
+  return buildCachedBlocks(STATIC_SYSTEM_PROMPT, userName, companyContext);
 }
 
 // Zbuduj system prompt z cache_control (wersja z narzędziami)
 function buildCachedToolSystemPrompt(userName, companyContext) {
-  return [
-    {
-      type: 'text',
-      text: STATIC_SYSTEM_PROMPT + TOOL_INSTRUCTION,
-      cache_control: { type: 'ephemeral' },
-    },
-    {
-      type: 'text',
-      text: buildDynamicBlock(userName, companyContext),
-    },
-  ];
+  return buildCachedBlocks(STATIC_SYSTEM_PROMPT + TOOL_INSTRUCTION, userName, companyContext);
 }
 
 module.exports = {

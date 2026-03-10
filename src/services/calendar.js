@@ -93,8 +93,138 @@ function formatEventTime(start, end) {
   return `${fmt(start)}-${fmt(end)}`;
 }
 
-// Reużyj buildDateRange z workforce.js, ale ogranicz startDate do dziś
+// Mapa polskich nazw dni tygodnia → getDay() (0=niedziela)
+const DAY_NAMES_MAP = {
+  'poniedziałek': 1, 'poniedzialek': 1,
+  'wtorek': 2,
+  'środa': 3, 'sroda': 3, 'środę': 3, 'srode': 3, 'środy': 3,
+  'czwartek': 4,
+  'piątek': 5, 'piatek': 5,
+  'sobota': 6, 'sobotę': 6, 'sobote': 6, 'soboty': 6,
+  'niedziela': 0, 'niedzielę': 0, 'niedziele': 0, 'niedzieli': 0,
+};
+
+// Date → 'YYYY-MM-DD' (local timezone, nie UTC)
+function toDateStr(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+// Poniedziałek danego tygodnia
+function getMonday(date) {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return d;
+}
+
+// Najbliższy dzień tygodnia (od from włącznie)
+function findNextDayOfWeek(from, targetDay) {
+  const d = new Date(from);
+  const current = d.getDay();
+  let diff = targetDay - current;
+  if (diff < 0) diff += 7;
+  d.setDate(d.getDate() + diff);
+  return d;
+}
+
+// Smart parser dat kalendarza — rozumie polskie wyrażenia czasowe
+function parseCalendarDate(text) {
+  const lower = text.toLowerCase();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // "dziś" / "dzisiaj" / "dzis"
+  if (/(^|\s)(dzi[sś]|dzisiaj)(\s|$|[?!.,])/.test(lower)) {
+    const d = toDateStr(today);
+    return { startDate: d, endDate: d };
+  }
+
+  // "pojutrze" (przed "jutro" żeby nie matchować "jutro" w "pojutrze")
+  if (/\bpojutrze\b/.test(lower)) {
+    const d = new Date(today);
+    d.setDate(d.getDate() + 2);
+    const s = toDateStr(d);
+    return { startDate: s, endDate: s };
+  }
+
+  // "jutro"
+  if (/\bjutro\b/.test(lower)) {
+    const d = new Date(today);
+    d.setDate(d.getDate() + 1);
+    const s = toDateStr(d);
+    return { startDate: s, endDate: s };
+  }
+
+  // "ten tydzień" / "tym tygodniu" / "tego tygodnia" / "bieżący tydzień"
+  if (/\b(ten tydzień|tym tygodni|tego tygodni|bieżąc\w* tydzi)/i.test(lower)) {
+    const mon = getMonday(today);
+    const sun = new Date(mon);
+    sun.setDate(sun.getDate() + 6);
+    return { startDate: toDateStr(mon), endDate: toDateStr(sun) };
+  }
+
+  // "przyszły/następny tydzień" + opcjonalny dzień
+  const nextWeekMatch = lower.match(/\b(przysz[łl]\w*|nast[eę]pn\w*)\s+(tydzie[nń]|tygodn\w+)/);
+  if (nextWeekMatch) {
+    const nextMon = getMonday(today);
+    nextMon.setDate(nextMon.getDate() + 7);
+    const nextSun = new Date(nextMon);
+    nextSun.setDate(nextSun.getDate() + 6);
+
+    // Szukaj dnia tygodnia w tekście
+    for (const [name, dayNum] of Object.entries(DAY_NAMES_MAP)) {
+      if (lower.includes(name)) {
+        const target = new Date(nextMon);
+        let diff = dayNum - 1; // 1=poniedziałek offset od poniedziałku
+        if (dayNum === 0) diff = 6; // niedziela = +6 od poniedziałku
+        target.setDate(target.getDate() + diff);
+        const s = toDateStr(target);
+        return { startDate: s, endDate: s };
+      }
+    }
+
+    return { startDate: toDateStr(nextMon), endDate: toDateStr(nextSun) };
+  }
+
+  // "przyszły/następny" + dzień tygodnia (bez "tydzień")
+  const nextDayMatch = lower.match(/\b(przysz[łl]\w*|nast[eę]pn\w*)\s+/);
+  if (nextDayMatch) {
+    for (const [name, dayNum] of Object.entries(DAY_NAMES_MAP)) {
+      if (lower.includes(name)) {
+        const nextMon = getMonday(today);
+        nextMon.setDate(nextMon.getDate() + 7);
+        const target = new Date(nextMon);
+        let diff = dayNum - 1;
+        if (dayNum === 0) diff = 6;
+        target.setDate(target.getDate() + diff);
+        const s = toDateStr(target);
+        return { startDate: s, endDate: s };
+      }
+    }
+  }
+
+  // Sam dzień tygodnia → najbliższy (od dziś)
+  for (const [name, dayNum] of Object.entries(DAY_NAMES_MAP)) {
+    if (lower.includes(name)) {
+      const d = findNextDayOfWeek(today, dayNum);
+      const s = toDateStr(d);
+      return { startDate: s, endDate: s };
+    }
+  }
+
+  // Brak dopasowania → null (fallback do workforce)
+  return null;
+}
+
+// Reużyj buildDateRange z workforce.js, ale najpierw spróbuj parseCalendarDate
 function buildCalendarDateRange(query) {
+  const smart = parseCalendarDate(query);
+  if (smart) return smart;
+
   const { buildDateRange } = require('./workforce');
   const range = buildDateRange(query);
   const today = new Date().toISOString().split('T')[0];
@@ -162,6 +292,7 @@ module.exports = {
   getEvents,
   normalizeEvent,
   formatEventTime,
+  parseCalendarDate,
   buildCalendarDateRange,
   buildContextFromCalendar,
   createCalendarEvent,
