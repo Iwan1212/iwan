@@ -73,9 +73,8 @@ async function evaluateMessage(app, message, channelName) {
   // 1. Czy kanał jest proaktywny?
   if (!isProactiveChannel(channelId)) return;
 
-  // 2. Pomijaj wiadomości z @mention bota (obsługiwane przez app_mention handler)
-  const botUserId = (app._botUserId || '');
-  if (message.text && message.text.includes(`<@${botUserId}>`)) return;
+  // 2. Pomijaj wiadomości z @mentions (obsługiwane przez app_mention handler)
+  if (message.text && /<@[A-Z0-9]+>/.test(message.text)) return;
 
   // 3. Zbierz triggery
   const triggers = collectTriggers(message, channelId);
