@@ -84,7 +84,7 @@ function getToolDefinitions() {
     },
     {
       name: 'search_calendar',
-      description: 'Przeszukaj Google Calendar — spotkania, wydarzenia, dostępność. Używaj do pytań o spotkania, harmonogram dnia, co jest zaplanowane, kiedy ktoś jest zajęty. WAŻNE: Brak wydarzeń w kalendarzu NIE oznacza dnia wolnego — dni wolne to tylko soboty i niedziele. Nie mów użytkownikowi że ma wolny dzień tylko dlatego że nie ma spotkań. WAŻNE: Zawsze wywołuj to narzędzie gdy pytanie dotyczy kalendarza lub spotkań — nawet w follow-up wiadomościach w wątku. Jeśli użytkownik podaje konkretną datę, użyj jej w query. Masz dostęp do kalendarza przez Google API — nigdy nie mów że nie masz dostępu.',
+      description: 'Przeszukaj Google Calendar — spotkania, wydarzenia, dostępność. Używaj do pytań o spotkania, harmonogram dnia, co jest zaplanowane, kiedy ktoś jest zajęty. WAŻNE: Brak wydarzeń w kalendarzu NIE oznacza dnia wolnego — dni wolne to tylko soboty i niedziele. WAŻNE: Zawsze wywołuj to narzędzie gdy pytanie dotyczy kalendarza lub spotkań — nawet w follow-up wiadomościach w wątku. Jeśli użytkownik podaje konkretną datę, użyj jej w query. Masz dostęp do kalendarza przez Google API — nigdy nie mów że nie masz dostępu. WAŻNE: Tytuły eventów bywają skrótowe lub mają prefiksy (np. "[Strategia] - Leadership status"). Dopasowuj semantycznie — jeśli user pyta o "spotkanie leadershipowe K framework", event "[Strategia] - Leadership status i K Framework" TO JEST to spotkanie.',
       input_schema: {
         type: 'object',
         properties: {

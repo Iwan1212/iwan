@@ -184,7 +184,7 @@ function parseCalendarDate(text) {
   }
 
   // "przyszły/następny tydzień" + opcjonalny dzień
-  const nextWeekMatch = lower.match(/\b(przysz[łl]\w*|nast[eę]pn\w*)\s+(tydzie[nń]|tygodn\w+)/);
+  const nextWeekMatch = lower.match(/\b(przysz[łl]\S*|nast[eę]pn\S*)\s+(tydzie[nń]|tygodn\S+)/);
   if (nextWeekMatch) {
     const nextMon = getMonday(today);
     nextMon.setDate(nextMon.getDate() + 7);
@@ -207,7 +207,7 @@ function parseCalendarDate(text) {
   }
 
   // "przyszły/następny" + dzień tygodnia (bez "tydzień")
-  const nextDayMatch = lower.match(/\b(przysz[łl]\w*|nast[eę]pn\w*)\s+/);
+  const nextDayMatch = lower.match(/\b(przysz[łl]\S*|nast[eę]pn\S*)\s+/);
   if (nextDayMatch) {
     for (const [name, dayNum] of Object.entries(DAY_NAMES_MAP)) {
       if (lower.includes(name)) {
@@ -297,7 +297,7 @@ function buildContextFromCalendar(events) {
 
   const content = lines.join('\n').substring(0, 3000);
   const calNames = CALENDAR_IDS.map(id => id.split('@')[0]).join(', ');
-  return `\n\nKONTEKST Z GOOGLE CALENDAR (kalendarze: ${calNames}):\nUWAGA: To są TYLKO kalendarze podpiętych osób. Jeśli pytanie dotyczy kogoś innego — te dane NIE dotyczą tej osoby.\n---\n${content}\n---\n`;
+  return `\n\nKONTEKST Z GOOGLE CALENDAR (kalendarze: ${calNames}):\nUWAGA: To są TYLKO kalendarze podpiętych osób. Jeśli pytanie dotyczy kogoś innego — te dane NIE dotyczą tej osoby.\nUWAGA: Tytuły wydarzeń mogą nie pasować dosłownie do pytania użytkownika. Szukaj dopasowań semantycznych — np. "[Strategia] - Leadership status i K Framework" JEST spotkaniem leadershipowym o K Framework. Prefiksy w nawiasach (np. [Strategia], [Weekly]) to kategorie, nie pełne tytuły. Przeanalizuj KAŻDY event pod kątem pytania.\n---\n${content}\n---\n`;
 }
 
 // Utwórz nowe wydarzenie w kalendarzu
