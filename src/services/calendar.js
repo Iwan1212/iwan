@@ -295,7 +295,7 @@ function buildContextFromCalendar(events) {
     }
   }
 
-  const content = lines.join('\n').substring(0, 3000);
+  const content = lines.join('\n').substring(0, 6000);
   const calNames = CALENDAR_IDS.map(id => id.split('@')[0]).join(', ');
   return `\n\nKONTEKST Z GOOGLE CALENDAR (kalendarze: ${calNames}):\nUWAGA: To są TYLKO kalendarze podpiętych osób. Jeśli pytanie dotyczy kogoś innego — te dane NIE dotyczą tej osoby.\nUWAGA: Tytuły wydarzeń mogą nie pasować dosłownie do pytania użytkownika. Szukaj dopasowań semantycznych — np. "[Strategia] - Leadership status i K Framework" JEST spotkaniem leadershipowym o K Framework. Prefiksy w nawiasach (np. [Strategia], [Weekly]) to kategorie, nie pełne tytuły. Przeanalizuj KAŻDY event pod kątem pytania.\n---\n${content}\n---\n`;
 }
