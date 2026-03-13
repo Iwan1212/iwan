@@ -33,6 +33,24 @@ describe('parseCommand', () => {
     expect(action).toBe('szukaj');
     expect(args).toBe('hello world');
   });
+
+  it('parsuje komendę deal z nazwą', () => {
+    const { action, args } = parseCommand('deal Acme Corp');
+    expect(action).toBe('deal');
+    expect(args).toBe('Acme Corp');
+  });
+
+  it('parsuje komendę deals bez argumentów', () => {
+    const { action, args } = parseCommand('deals');
+    expect(action).toBe('deals');
+    expect(args).toBe('');
+  });
+
+  it('parsuje komendę deals z pipeline ID', () => {
+    const { action, args } = parseCommand('deals 1,26');
+    expect(action).toBe('deals');
+    expect(args).toBe('1,26');
+  });
 });
 
 describe('SLACK_ALLOWED_CHANNELS', () => {

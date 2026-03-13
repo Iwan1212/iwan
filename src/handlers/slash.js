@@ -2,6 +2,8 @@
 const { searchSlackHistory, buildContextFromMessages } = require('../services/search');
 const { searchNotion, getPageTitle, getPageText } = require('../services/notion');
 const { getTimeline, getEmployees, getProjects, buildDateRange, getUtilPercent, getAllocPercent } = require('../services/workforce');
+const { searchDeals, getDeal, getDealNotes, getActiveDeals, buildContextFromDeal, isPipedriveEnabled } = require('../services/pipedrive');
+const { ACTIVE_PIPELINES } = require('../services/dealConfig');
 const { resolveUserNames } = require('../services/users');
 const { logError } = require('../services/errors');
 
@@ -42,6 +44,10 @@ function setupSlashCommand(app) {
       await handleOverbooking(respond);
     } else if (action === 'projekty') {
       await handleProjekty(respond);
+    } else if (action === 'deal') {
+      await handleDeal(args, respond);
+    } else if (action === 'deals') {
+      await handleDeals(args, respond);
     } else {
       await handleHelp(respond);
     }
@@ -294,6 +300,91 @@ async function handleProjekty(respond) {
   }
 }
 
+// /iwan deal <nazwa> — status deala z Pipedrive
+async function handleDeal(dealName, respond) {
+  if (!dealName) {
+    await respond('Użycie: `/iwan deal <nazwa>` (np. `/iwan deal Acme`)');
+    return;
+  }
+  if (!isPipedriveEnabled()) {
+    await respond('Pipedrive nie jest skonfigurowany.');
+    return;
+  }
+
+  try {
+    const deals = await searchDeals(dealName);
+    if (deals.length === 0) {
+      await respond(`Nie znalazłem deala: *${dealName}*`);
+      return;
+    }
+
+    // Weź najlepszy match (pierwszy otwarty lub pierwszy w ogóle)
+    const match = deals.find(d => d.status === 'open') || deals[0];
+    const deal = await getDeal(match.id);
+    if (!deal) {
+      await respond(`Nie udało się pobrać danych deala *${match.title}*.`);
+      return;
+    }
+
+    const notes = await getDealNotes(match.id);
+    const ownerName = deal.owner_name || deal.user_id?.name || '?';
+    const orgName = deal.org_name || deal.org_id?.name || '';
+
+    const lines = [
+      `*${deal.title}*${orgName ? ` (${orgName})` : ''}`,
+      `• Status: ${deal.status}`,
+      `• Wartość: ${deal.value || '?'} ${deal.currency || ''}`,
+      `• Owner: ${ownerName}`,
+    ];
+
+    if (notes.length > 0) {
+      lines.push('', '*Ostatnie notatki:*');
+      for (const note of notes.slice(0, 3)) {
+        const content = (note.content || '').replace(/<[^>]+>/g, ' ').trim();
+        const preview = content.length > 200 ? content.substring(0, 200) + '...' : content;
+        lines.push(`• ${preview}`);
+      }
+    }
+
+    await respond(lines.join('\n'));
+  } catch (error) {
+    logError('slash-deal', 'Błąd pobierania deala', error.message);
+    await respond('Błąd pobierania danych z Pipedrive.');
+  }
+}
+
+// /iwan deals [pipeline_id] — lista aktywnych deali
+async function handleDeals(args, respond) {
+  if (!isPipedriveEnabled()) {
+    await respond('Pipedrive nie jest skonfigurowany.');
+    return;
+  }
+
+  try {
+    const pipelineIds = args ? args.split(',').map(Number).filter(Boolean) : [];
+    const pipelines = pipelineIds.length > 0 ? pipelineIds : ACTIVE_PIPELINES;
+    const deals = await getActiveDeals(pipelines);
+
+    if (deals.length === 0) {
+      await respond('Brak aktywnych deali w Pipedrive.');
+      return;
+    }
+
+    const lines = deals.slice(0, 20).map(d => {
+      const ownerName = d.owner_name || d.user_id?.name || '?';
+      const orgName = d.org_name || d.org_id?.name || '';
+      const value = d.value ? ` — ${d.value} ${d.currency || ''}` : '';
+      return `• *${d.title}*${orgName ? ` (${orgName})` : ''}${value} [${ownerName}]`;
+    });
+
+    const total = deals.length > 20 ? ` (pokazuję 20/${deals.length})` : '';
+    await respond(`*Aktywne deale${total}:*\n${lines.join('\n')}`);
+  } catch (error) {
+    logError('slash-deals', 'Błąd pobierania deali', error.message);
+    await respond('Błąd pobierania danych z Pipedrive.');
+  }
+}
+
 // /iwan (bez argumentów) — pokaż pomoc
 async function handleHelp(respond) {
   await respond(
@@ -304,6 +395,8 @@ async function handleHelp(respond) {
     `• \`/iwan kto-wolny [miesiąc]\` — kto jest dostępny\n` +
     `• \`/iwan overbooking\` — lista przeciążonych\n` +
     `• \`/iwan projekty\` — aktywne projekty\n` +
+    `• \`/iwan deal <nazwa>\` — status deala z Pipedrive\n` +
+    `• \`/iwan deals\` — lista aktywnych deali\n` +
     `• \`/iwan status\` — status bota\n` +
     `• Lub po prostu napisz \`@Iwan <pytanie>\``
   );

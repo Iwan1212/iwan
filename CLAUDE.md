@@ -18,6 +18,17 @@ Open-source AI agent Slack. Crawluje wiadomości z kanałów, odpowiada na pytan
 - TypeScript — piszemy w czystym JavaScript
 - Docker — Railway buduje sam
 
+## Integracja Pipedrive CRM
+- Klient API: src/services/pipedrive.js (search, get, notes, activities)
+- Deal resolver: src/services/dealResolver.js (Slack kanał → Pipedrive deal, cache w Supabase)
+- Daily digest: src/services/dealDigest.js (Pn-Pt, automatyczne podsumowania → Pipedrive notes)
+- Narzędzia Claude: search_pipedrive, deal_status (w tools.js + toolExecutor.js)
+- Slash commands: /iwan deal <name>, /iwan deals
+- Backfill: scripts/backfillDeals.js (--days N, --dry-run, --deal "Acme")
+- Knowledge system: knowledge/*.md → injected do LLM prompts (src/services/knowledge.js)
+- LLM fallback: src/services/openrouter.js (Anthropic → OpenRouter)
+- Supabase tabele: deal_channel_mappings, deal_digest_state (scripts/seed-deal-tables.sql)
+
 ## Zasady kodowania
 - Jedna funkcja = jedno zadanie
 - Max 30 linii na funkcję

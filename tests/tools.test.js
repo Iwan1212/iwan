@@ -5,7 +5,7 @@ describe('getToolDefinitions', () => {
   it('zwraca tablicę 7 narzędzi', () => {
     const tools = getToolDefinitions();
     expect(Array.isArray(tools)).toBe(true);
-    expect(tools).toHaveLength(8);
+    expect(tools).toHaveLength(10);
   });
 
   it('każde narzędzie ma wymagane pola Anthropic API', () => {
@@ -28,6 +28,8 @@ describe('getToolDefinitions', () => {
     expect(names).toContain('search_calamari');
     expect(names).toContain('search_calendar');
     expect(names).toContain('create_event');
+    expect(names).toContain('search_pipedrive');
+    expect(names).toContain('deal_status');
   });
 
   it('read_thread nie wymaga parametrów', () => {
@@ -56,7 +58,7 @@ describe('getToolDefinitionsWithCache', () => {
   it('zwraca tablicę 8 narzędzi', () => {
     const tools = getToolDefinitionsWithCache();
     expect(Array.isArray(tools)).toBe(true);
-    expect(tools).toHaveLength(8);
+    expect(tools).toHaveLength(10);
   });
 
   it('ostatnie narzędzie ma cache_control', () => {

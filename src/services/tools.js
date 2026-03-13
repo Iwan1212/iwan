@@ -97,6 +97,34 @@ function getToolDefinitions() {
       },
     },
     {
+      name: 'search_pipedrive',
+      description: 'Przeszukaj Pipedrive CRM — deale, statusy, wartości, właściciele. Używaj do pytań o deale, klientów, szanse sprzedażowe, pipeline, co się dzieje z danym dealem.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description: 'Nazwa deala lub firmy do wyszukania w Pipedrive',
+          },
+        },
+        required: ['query'],
+      },
+    },
+    {
+      name: 'deal_status',
+      description: 'Pobierz pełny status deala z Pipedrive CRM — dane CRM + ostatnie notatki + powiązane wiadomości Slack. Używaj gdy użytkownik pyta o status konkretnego deala, podsumowanie deala, co nowego w danym dealu. WAŻNE: Wymaga ID deala — najpierw użyj search_pipedrive żeby znaleźć deal.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          deal_id: {
+            type: 'number',
+            description: 'ID deala w Pipedrive (uzyskaj z search_pipedrive)',
+          },
+        },
+        required: ['deal_id'],
+      },
+    },
+    {
       name: 'create_event',
       description: 'Utwórz nowe spotkanie/wydarzenie w Google Calendar. Używaj gdy użytkownik chce umówić spotkanie, zaplanować meeting, dodać wydarzenie do kalendarza.',
       input_schema: {

@@ -6,6 +6,7 @@ const { searchNotion, buildContextFromNotion } = require('./notion');
 const { buildDateRange, getTimeline, buildContextFromWorkforce } = require('./workforce');
 const { getAbsences, buildCalamariDateRange, buildContextFromCalamari } = require('./calamari');
 const { getEvents, buildCalendarDateRange, buildContextFromCalendar, createCalendarEvent } = require('./calendar');
+const { searchDeals, getDeal, getDealNotes, buildContextFromDeal, buildContextFromDeals } = require('./pipedrive');
 const { resolveUserNames } = require('./users');
 const { logError } = require('./errors');
 
@@ -119,6 +120,18 @@ function createToolExecutors(app, channelId, threadTs) {
         attendees,
         description,
       });
+    },
+
+    search_pipedrive: async ({ query }) => {
+      const deals = await searchDeals(query);
+      return buildContextFromDeals(deals);
+    },
+
+    deal_status: async ({ deal_id }) => {
+      const deal = await getDeal(deal_id);
+      if (!deal) return 'Nie znaleziono deala o podanym ID.';
+      const notes = await getDealNotes(deal_id);
+      return buildContextFromDeal(deal, notes);
     },
   };
 }

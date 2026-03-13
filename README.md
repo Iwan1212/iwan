@@ -4,11 +4,11 @@
 
 ### Open Source AI Agent for Slack
 
-Mention `@Iwan` in Slack — it searches your message history, Notion docs, and Workforce Planner, then answers using Claude AI with full context.
+Mention `@Iwan` in Slack — it searches your message history, Notion docs, Workforce Planner, and Pipedrive CRM, then answers using Claude AI with full context.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js](https://img.shields.io/badge/Node.js-20.x-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
-[![Tests](https://img.shields.io/badge/Tests-109%20passing-brightgreen)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-353%20passing-brightgreen)](tests/)
 [![Claude AI](https://img.shields.io/badge/AI-Claude%20Sonnet-blueviolet)](https://anthropic.com)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
 
@@ -20,7 +20,7 @@ Mention `@Iwan` in Slack — it searches your message history, Notion docs, and 
 
 ## What Iwan Does
 
-Iwan is a Slack bot that connects to three data sources — Slack message history, Notion, and Workforce Planner — and uses Claude AI to answer questions with context from all three.
+Iwan is a Slack bot that connects to four data sources — Slack message history, Notion, Workforce Planner, and Pipedrive CRM — and uses Claude AI to answer questions with context from all of them.
 
 You ask a question in Slack. Iwan figures out which sources are relevant, fetches the data in parallel, and passes it to Claude as context. Claude generates the answer. The whole thing takes 2-5 seconds.
 
@@ -102,12 +102,22 @@ src/
 │   ├── users.js              # User name resolution + cache
 │   ├── channels.js           # Channel name cache
 │   ├── errors.js             # Error logging to Supabase
-│   └── supabase.js           # Database client
+│   ├── supabase.js           # Database client
+│   ├── pipedrive.js          # Pipedrive CRM API (deals, notes, activities)
+│   ├── dealResolver.js       # Slack channel → Pipedrive deal mapping
+│   ├── dealDigest.js         # Daily digest (Slack → Pipedrive notes)
+│   ├── knowledge.js          # Knowledge file loader (knowledge/*.md)
+│   └── openrouter.js         # LLM fallback via OpenRouter
 └── crawler/
     ├── listener.js           # Real-time message listener (all channels)
     └── saveMessage.js        # Persist to slack_messages table
 
-tests/                        # 109 tests (Jest), ~0.3s total runtime
+knowledge/                    # Company context for LLM prompts (.md files, auto-loaded)
+├── company.md                # Business context, team, services
+├── sales-process.md          # Pipeline stages, qualification rules
+└── bot-persona.md            # Bot personality and communication style
+
+tests/                        # 353 tests (Jest), ~6s total runtime
 ├── workforce.test.js         # 31 tests — routing, auth, context building
 ├── notion.test.js            # 26 tests — keyword extraction, page parsing
 ├── slash.test.js
@@ -132,6 +142,20 @@ Searches your workspace for relevant pages. Extracts keywords from the question 
 
 **What works:** Finding pages by keyword, extracting structured content (tables, nested blocks).
 **What doesn't:** Semantic search (keyword-only), database entries with complex filters.
+
+### Pipedrive CRM
+
+Full integration with Pipedrive CRM for deal intelligence. Iwan can search deals, show deal status with CRM data + Slack context, and automatically sync Slack conversations to Pipedrive deal notes.
+
+**Features:**
+- **On-demand deal status** — ask `@Iwan status deal Acme` or use `/iwan deal Acme`
+- **Daily digest** — automated Mon-Fri summaries of Slack conversations written to Pipedrive as deal notes with `[Slack Summary]` prefix
+- **Deal resolution** — automatically maps Slack channels to Pipedrive deals (dedicated `#sales-*` channels by prefix, shared channels by LLM extraction)
+- **Action items** — extracts next steps from conversations and creates Pipedrive activities
+- **Backfill** — process historical messages with `node scripts/backfillDeals.js --days 7`
+
+**What works:** Deal search, notes, activities, daily digest, channel-to-deal mapping.
+**What doesn't:** Two-way sync (Pipedrive → Slack notifications), deal health scoring (planned).
 
 ### Workforce Planner
 
@@ -174,6 +198,8 @@ All commands are currently in **Polish only**. English aliases are the [top prio
 | `/iwan kto-wolny [month]` | List people with <30% utilization |
 | `/iwan overbooking` | List people with >100% utilization (next 2 months) |
 | `/iwan projekty` | List active projects (note: doesn't show assigned people yet) |
+| `/iwan deal <name>` | Show Pipedrive deal status (CRM data + recent notes) |
+| `/iwan deals` | List all active deals from configured pipelines |
 | `/iwan status` | Bot uptime and memory usage |
 
 ---
@@ -221,6 +247,25 @@ npm start               # starts Socket Mode connection
 | Variable | Description |
 |----------|-------------|
 | `NOTION_TOKEN` | Notion integration token (`secret_...`). Without this, Notion search is silently skipped. |
+
+</details>
+
+<details>
+<summary><strong>Optional — Pipedrive CRM</strong></summary>
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PIPEDRIVE_API_TOKEN` | — | Pipedrive API token. Without this, all CRM features are disabled. |
+| `PIPEDRIVE_DOMAIN` | — | Your Pipedrive subdomain (e.g. `your-company`) |
+| `DEAL_ACTIVE_PIPELINES` | — | Comma-separated pipeline IDs to monitor (e.g. `1,26`) |
+| `DEAL_DIGEST_CHANNEL` | — | Slack channel ID for digest status messages |
+| `DEAL_DIGEST_HOUR` | `7` | Hour to run daily digest (0-23) |
+| `DEAL_SALES_PREFIX` | `sales-` | Prefix for auto-discovered deal channels |
+| `DEAL_MONITORED_CHANNELS` | — | Comma-separated shared channel names (threads processed individually) |
+| `DEAL_MIN_MESSAGES` | `3` | Min messages before a thread gets summarized |
+| `DEAL_NOTE_PREFIX` | `[Slack Summary]` | Prefix on Pipedrive notes |
+| `DEAL_LANGUAGE` | `pl` | Summary language |
+| `OPENROUTER_API_KEY` | — | OpenRouter API key for LLM fallback (optional) |
 
 </details>
 

@@ -129,7 +129,7 @@ describe('askClaudeWithTools', () => {
 
     const callArgs = getCreateMock().mock.calls[0][0];
     expect(callArgs).toHaveProperty('tools');
-    expect(callArgs.tools).toHaveLength(8);
+    expect(callArgs.tools).toHaveLength(10);
     // Ostatnie narzędzie ma cache_control
     const lastTool = callArgs.tools[callArgs.tools.length - 1];
     expect(lastTool.cache_control).toEqual({ type: 'ephemeral' });

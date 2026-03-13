@@ -11,6 +11,7 @@ const { createToolExecutors } = require('./services/toolExecutor');
 
 const useTools = process.env.ENABLE_TOOL_USE === 'true';
 const { setupWorkforceAlerts, setupWeeklySummary } = require('./services/workforceAlerts');
+const { setupDealDigest } = require('./services/dealDigest');
 const { validateMessage } = require('./services/validate');
 const { checkRateLimit } = require('./services/ratelimit');
 const { classifyMessage } = require('./services/classify');
@@ -225,6 +226,9 @@ setupApprovalActions(app);
 // Włącz alerty i weekly summary z Workforce Planner
 setupWorkforceAlerts(app);
 setupWeeklySummary(app);
+
+// Włącz daily deal digest (Slack → Pipedrive)
+setupDealDigest(app);
 
 // Start bota
 (async () => {
