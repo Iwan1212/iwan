@@ -22,7 +22,7 @@ Cel: 7.5/10+ — kolejność faz: resilience → features → optymalizacja → 
 |------|----|--------|
 | 0 | Docker + CI/CD | DONE |
 | 1 | TypeScript migration | DONE |
-| 2 | Multi-Provider LLM | do zrobienia |
+| 2 | Multi-Provider LLM | DONE |
 | 3 | Write Tools (Pipedrive + Slack) | DONE |
 | 4 | Redis Cache | do zrobienia |
 | 5 | Proactive 2.0 (cron, digest, anomaly) | do zrobienia |
