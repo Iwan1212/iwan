@@ -28,5 +28,8 @@
     "@supabase/supabase-js": "^2.97.0",
     "dotenv": "^17.3.1",
     "googleapis": "^171.4.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
   }
 }

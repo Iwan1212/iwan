@@ -1,0 +1,9 @@
+node_modules
+.env
+.git
+.claude
+tests
+docs
+scripts
+*.md
+.DS_Store
