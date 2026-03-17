@@ -1,23 +1,17 @@
-// Testy Haiku respondera dla small-talk
-jest.mock('@anthropic-ai/sdk', () => {
-  const createMock = jest.fn();
-  return jest.fn().mockImplementation(() => ({
-    messages: { create: createMock },
-  }));
-});
+// Testy Haiku respondera dla small-talk (przez zunifikowany LLM)
+jest.mock('../src/services/llm', () => ({
+  ask: jest.fn(),
+  createMessage: jest.fn(),
+}));
 
-const Anthropic = require('@anthropic-ai/sdk');
+const { ask } = require('../src/services/llm');
 const { askHaiku } = require('../src/services/claudeHaiku');
 
-const getCreateMock = () => new Anthropic().messages.create;
+beforeEach(() => ask.mockReset());
 
 describe('askHaiku', () => {
-  beforeEach(() => getCreateMock().mockReset());
-
   it('zwraca tekst odpowiedzi', async () => {
-    getCreateMock().mockResolvedValue({
-      content: [{ text: 'Siema! Stay hard! 💪' }],
-    });
+    ask.mockResolvedValue('Siema! Stay hard! 💪');
     const result = await askHaiku(
       [{ role: 'user', content: 'Cześć' }],
       'Jan',
@@ -25,44 +19,36 @@ describe('askHaiku', () => {
     expect(result).toBe('Siema! Stay hard! 💪');
   });
 
-  it('używa modelu Haiku', async () => {
-    getCreateMock().mockResolvedValue({
-      content: [{ text: 'OK' }],
-    });
+  it('używa tier fast', async () => {
+    ask.mockResolvedValue('OK');
     await askHaiku([{ role: 'user', content: 'Siema' }], 'Jan');
-    expect(getCreateMock()).toHaveBeenCalledWith(
-      expect.objectContaining({ model: expect.stringContaining('haiku') })
+    expect(ask).toHaveBeenCalledWith(
+      expect.objectContaining({ tier: 'fast' })
     );
   });
 
-  it('ustawia max_tokens na 256', async () => {
-    getCreateMock().mockResolvedValue({
-      content: [{ text: 'OK' }],
-    });
+  it('ustawia maxTokens na 256', async () => {
+    ask.mockResolvedValue('OK');
     await askHaiku([{ role: 'user', content: 'Co tam?' }], 'Jan');
-    expect(getCreateMock()).toHaveBeenCalledWith(
-      expect.objectContaining({ max_tokens: 256 })
+    expect(ask).toHaveBeenCalledWith(
+      expect.objectContaining({ maxTokens: 256 })
     );
   });
 
   it('zawiera userName w system prompt', async () => {
-    getCreateMock().mockResolvedValue({
-      content: [{ text: 'OK' }],
-    });
+    ask.mockResolvedValue('OK');
     await askHaiku([{ role: 'user', content: 'Hej' }], 'Anna Nowak');
-    expect(getCreateMock()).toHaveBeenCalledWith(
+    expect(ask).toHaveBeenCalledWith(
       expect.objectContaining({
         system: expect.stringContaining('Anna Nowak'),
       })
     );
   });
 
-  it('nie przekazuje tools', async () => {
-    getCreateMock().mockResolvedValue({
-      content: [{ text: 'OK' }],
-    });
+  it('nie przekazuje tools (używa ask, nie createMessage)', async () => {
+    ask.mockResolvedValue('OK');
     await askHaiku([{ role: 'user', content: 'test' }], 'Jan');
-    const callArgs = getCreateMock().mock.calls[0][0];
+    const callArgs = ask.mock.calls[0][0];
     expect(callArgs).not.toHaveProperty('tools');
   });
 });

@@ -1,6 +1,5 @@
 // src/services/claude.ts
-import { anthropic } from './anthropicClient.js';
-import { MODEL_SONNET } from './models.js';
+import { ask } from './llm.js';
 import { STATIC_SYSTEM_PROMPT } from './promptCache.js';
 import type { ChatMessage } from '../types/index.js';
 
@@ -14,34 +13,31 @@ function buildSystemPrompt(userName: string, companyContext: string): string {
 
 // Wyślij wiadomość do Claude i zwróć odpowiedź
 export async function askClaude(userMessage: string, userName: string, companyContext = ''): Promise<string> {
-  const response = await anthropic.messages.create({
-    model: MODEL_SONNET,
-    max_tokens: 1024,
+  return await ask({
+    tier: 'smart',
+    maxTokens: 1024,
     system: buildSystemPrompt(userName, companyContext),
     messages: [{ role: 'user', content: userMessage }],
   });
-  return (response.content[0] as { text: string }).text;
 }
 
 // Wyślij wiadomość do Claude z historią rozmowy
 export async function askClaudeWithHistory(messages: ChatMessage[], userName: string, companyContext = ''): Promise<string> {
-  const response = await anthropic.messages.create({
-    model: MODEL_SONNET,
-    max_tokens: 1024,
+  return await ask({
+    tier: 'smart',
+    maxTokens: 1024,
     system: buildSystemPrompt(userName, companyContext),
-    messages: messages,
+    messages,
   });
-  return (response.content[0] as { text: string }).text;
 }
 
 // Wyślij wiadomość do Claude z kontekstem ze Slacka i historią rozmowy
 export async function askClaudeWithContext(messages: ChatMessage[], slackContext: string, userName: string, companyContext = ''): Promise<string> {
   const systemWithContext = buildSystemPrompt(userName, companyContext) + slackContext;
-  const response = await anthropic.messages.create({
-    model: MODEL_SONNET,
-    max_tokens: 1024,
+  return await ask({
+    tier: 'smart',
+    maxTokens: 1024,
     system: systemWithContext,
-    messages: messages,
+    messages,
   });
-  return (response.content[0] as { text: string }).text;
 }

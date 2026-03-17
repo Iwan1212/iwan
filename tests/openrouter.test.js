@@ -7,7 +7,7 @@ global.fetch = mockFetch;
 
 process.env.OPENROUTER_API_KEY = 'test-key';
 
-const { isOpenRouterEnabled, askOpenRouter, withFallback } = require('../src/services/openrouter');
+const { isOpenRouterEnabled, askOpenRouter, callOpenRouter } = require('../src/services/openrouter');
 
 beforeEach(() => {
   mockFetch.mockReset();
@@ -47,38 +47,41 @@ describe('askOpenRouter', () => {
   });
 });
 
-describe('withFallback', () => {
-  it('zwraca wynik primary gdy działa', async () => {
-    const primary = jest.fn().mockResolvedValue('primary result');
-    const result = await withFallback(primary, [], '', 1024);
-    expect(result).toBe('primary result');
-  });
-
-  it('fallback do OpenRouter gdy primary rzuca błąd', async () => {
-    const primary = jest.fn().mockRejectedValue(new Error('Anthropic down'));
+describe('callOpenRouter', () => {
+  it('zwraca znormalizowaną LLMResponse', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       json: async () => ({
-        choices: [{ message: { content: 'fallback result' } }],
+        choices: [{ message: { content: 'OpenRouter response' }, finish_reason: 'stop' }],
+        usage: { prompt_tokens: 10, completion_tokens: 5 },
       }),
     });
 
-    const result = await withFallback(
-      primary,
-      [{ role: 'user', content: 'test' }],
-      'system prompt',
-      1024,
-    );
+    const result = await callOpenRouter({
+      tier: 'smart',
+      messages: [{ role: 'user', content: 'test' }],
+    });
 
-    expect(result).toBe('fallback result');
+    expect(result.text).toBe('OpenRouter response');
+    expect(result.provider).toBe('openrouter');
+    expect(result.usage.inputTokens).toBe(10);
+    expect(result.usage.outputTokens).toBe(5);
   });
 
-  it('rzuca oryginalny błąd gdy oba failują', async () => {
-    const primary = jest.fn().mockRejectedValue(new Error('Primary failed'));
-    mockFetch.mockResolvedValue({ ok: false, status: 500 });
+  it('używa modelu Haiku dla tier fast', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: 'OK' }, finish_reason: 'stop' }],
+        usage: { prompt_tokens: 1, completion_tokens: 1 },
+      }),
+    });
 
-    await expect(
-      withFallback(primary, [{ role: 'user', content: 'test' }], '', 1024)
-    ).rejects.toThrow('Primary failed');
+    const result = await callOpenRouter({
+      tier: 'fast',
+      messages: [{ role: 'user', content: 'test' }],
+    });
+
+    expect(result.model).toContain('haiku');
   });
 });

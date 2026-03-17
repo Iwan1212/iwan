@@ -1,10 +1,16 @@
 // src/services/openrouter.ts — fallback LLM przez OpenRouter API
-import { logError } from './errors.js';
 import type { ChatMessage } from '../types/index.js';
+import type { LLMRequest, LLMResponse, ModelTier } from './llm.js';
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
 const OPENROUTER_MODEL = 'anthropic/claude-sonnet-4-20250514';
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
+
+// Mapowanie tier → model OpenRouter
+const OR_MODEL_MAP: Record<ModelTier, string> = {
+  fast: 'anthropic/claude-haiku-4-5-20251001',
+  smart: 'anthropic/claude-sonnet-4-5-20250929',
+};
 
 // Sprawdź czy OpenRouter jest skonfigurowany
 export function isOpenRouterEnabled(): boolean {
@@ -40,18 +46,57 @@ export async function askOpenRouter(messages: ChatMessage[], systemPrompt = '', 
   return data.choices[0].message.content;
 }
 
-// Wrapper z fallback: próbuj primaryFn, przy błędzie → OpenRouter
-export async function withFallback(primaryFn: () => Promise<string>, messages: ChatMessage[], systemPrompt: string, maxTokens: number): Promise<string> {
-  try {
-    return await primaryFn();
-  } catch (error) {
-    if (!isOpenRouterEnabled()) throw error;
-    console.log(`[openrouter] Anthropic failed (${(error as Error).message}), fallback to OpenRouter`);
-    try {
-      return await askOpenRouter(messages, systemPrompt, maxTokens);
-    } catch (fallbackError) {
-      logError('openrouter', 'Fallback też nie zadziałał', (fallbackError as Error).message);
-      throw error;
-    }
+// Zunifikowany interfejs dla llm.ts — wywołaj OpenRouter z LLMRequest
+export async function callOpenRouter(req: LLMRequest): Promise<LLMResponse> {
+  const model = OR_MODEL_MAP[req.tier];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const apiMessages: any[] = [];
+
+  // System prompt — skonwertuj CacheBlock[] lub string na string
+  if (req.system) {
+    const systemText = Array.isArray(req.system)
+      ? (req.system as { text: string }[]).map(b => b.text).join('\n')
+      : req.system as string;
+    apiMessages.push({ role: 'system', content: systemText });
   }
+
+  // Messages — normalizuj do OpenAI format
+  for (const msg of req.messages as { role: string; content: unknown }[]) {
+    const content = typeof msg.content === 'string'
+      ? msg.content
+      : JSON.stringify(msg.content);
+    apiMessages.push({ role: msg.role, content });
+  }
+
+  const res = await fetch(OPENROUTER_URL, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model,
+      messages: apiMessages,
+      max_tokens: req.maxTokens || 1024,
+      ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
+    }),
+  });
+
+  if (!res.ok) throw new Error(`OpenRouter API: ${res.status}`);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const data = await res.json() as any;
+  const text = data.choices?.[0]?.message?.content || '';
+
+  return {
+    text,
+    stopReason: data.choices?.[0]?.finish_reason || 'end_turn',
+    content: [{ type: 'text', text }],
+    usage: {
+      inputTokens: data.usage?.prompt_tokens || 0,
+      outputTokens: data.usage?.completion_tokens || 0,
+    },
+    provider: 'openrouter',
+    model,
+  };
 }

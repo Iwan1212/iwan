@@ -1,6 +1,5 @@
 // src/services/dealDigest.ts — automatyczny daily digest: Slack → Pipedrive notes
-import { anthropic } from './anthropicClient.js';
-import { MODEL_SONNET } from './models.js';
+import { ask } from './llm.js';
 import { supabase } from './supabase.js';
 import { getDealNotes, findAgentNote, createNote, updateNote, createActivity } from './pipedrive.js';
 import { resolveChannelToDeal, resolveThreadToDeal } from './dealResolver.js';
@@ -150,9 +149,9 @@ export async function generateSummary(messages: DigestMessage[], deal: any): Pro
   const orgPart = orgName ? ` (${orgName})` : '';
 
   try {
-    const response = await anthropic.messages.create({
-      model: MODEL_SONNET,
-      max_tokens: 2000,
+    const responseText = await ask({
+      tier: 'smart',
+      maxTokens: 2000,
       system: buildDigestSystemPrompt(),
       messages: [{
         role: 'user',
@@ -165,7 +164,7 @@ export async function generateSummary(messages: DigestMessage[], deal: any): Pro
       }],
     });
 
-    const result = cleanLlmJson((response.content[0] as { text: string }).text) as unknown as DigestResult;
+    const result = cleanLlmJson(responseText) as unknown as DigestResult;
 
     if (!result.has_meaningful_content) return null;
 

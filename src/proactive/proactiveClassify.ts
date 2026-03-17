@@ -1,6 +1,5 @@
 // src/proactive/proactiveClassify.ts — Haiku gatekeeper: czy Iwan powinien się odezwać?
-import { anthropic } from '../services/anthropicClient.js';
-import { MODEL_HAIKU } from '../services/models.js';
+import { ask } from '../services/llm.js';
 import { getProactiveConfig } from './config.js';
 
 interface GatekeeperResult {
@@ -9,11 +8,11 @@ interface GatekeeperResult {
   reason: string;
 }
 
-// Zapytaj Haiku czy Iwan powinien się odezwać
+// Zapytaj LLM (fast tier) czy Iwan powinien się odezwać
 export async function shouldIwanRespond(conversationText: string, triggerReason: string): Promise<GatekeeperResult> {
-  const response = await anthropic.messages.create({
-    model: MODEL_HAIKU,
-    max_tokens: 100,
+  const text = await ask({
+    tier: 'fast',
+    maxTokens: 100,
     messages: [{
       role: 'user',
       content: `Jesteś gatekeeperem bota Iwan (asystent zespołu). Zdecyduj czy bot powinien się odezwać proaktywnie.
@@ -36,8 +35,7 @@ Zasady:
     }],
   });
 
-  const text = (response.content[0] as { text: string }).text.trim();
-  return parseGatekeeperResponse(text);
+  return parseGatekeeperResponse(text.trim());
 }
 
 // Parsuj odpowiedź gatekeepera

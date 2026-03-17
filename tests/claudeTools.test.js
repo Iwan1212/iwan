@@ -1,17 +1,13 @@
-// Testy Claude z pętlą tool use i prompt caching
+// Testy Claude z pętlą tool use i prompt caching (przez zunifikowany LLM)
 jest.mock('../src/services/supabase', () => ({ supabase: {} }));
 jest.mock('../src/services/errors', () => ({ logError: jest.fn() }));
-jest.mock('@anthropic-ai/sdk', () => {
-  const createMock = jest.fn();
-  return jest.fn().mockImplementation(() => ({
-    messages: { create: createMock },
-  }));
-});
+jest.mock('../src/services/llm', () => ({
+  ask: jest.fn(),
+  createMessage: jest.fn(),
+}));
 
-const Anthropic = require('@anthropic-ai/sdk');
+const { createMessage } = require('../src/services/llm');
 const { askClaudeWithTools, extractText } = require('../src/services/claudeTools');
-
-const getCreateMock = () => new Anthropic().messages.create;
 
 describe('extractText', () => {
   it('wyciąga tekst z text bloków', () => {
@@ -32,12 +28,16 @@ describe('extractText', () => {
 });
 
 describe('askClaudeWithTools', () => {
-  beforeEach(() => getCreateMock().mockReset());
+  beforeEach(() => createMessage.mockReset());
 
   it('zwraca tekst gdy Claude nie woła narzędzi', async () => {
-    getCreateMock().mockResolvedValue({
-      stop_reason: 'end_turn',
+    createMessage.mockResolvedValue({
+      stopReason: 'end_turn',
       content: [{ type: 'text', text: 'Cześć! Jak mogę pomóc?' }],
+      text: 'Cześć! Jak mogę pomóc?',
+      usage: { inputTokens: 10, outputTokens: 5 },
+      provider: 'anthropic',
+      model: 'claude-sonnet-4-5-20250929',
     });
 
     const result = await askClaudeWithTools(
@@ -46,23 +46,30 @@ describe('askClaudeWithTools', () => {
       'Jan',
     );
     expect(result).toBe('Cześć! Jak mogę pomóc?');
-    expect(getCreateMock()).toHaveBeenCalledTimes(1);
+    expect(createMessage).toHaveBeenCalledTimes(1);
   });
 
   it('wykonuje pętlę tool use i zwraca finalny tekst', async () => {
-    const createMock = getCreateMock();
     // Runda 1: Claude woła narzędzie
-    createMock.mockResolvedValueOnce({
-      stop_reason: 'tool_use',
+    createMessage.mockResolvedValueOnce({
+      stopReason: 'tool_use',
       content: [
         { type: 'text', text: '' },
         { type: 'tool_use', id: 'call_1', name: 'search_slack_history', input: { query: 'weekly' } },
       ],
+      text: '',
+      usage: { inputTokens: 10, outputTokens: 5 },
+      provider: 'anthropic',
+      model: 'claude-sonnet-4-5-20250929',
     });
     // Runda 2: Claude odpowiada tekstem
-    createMock.mockResolvedValueOnce({
-      stop_reason: 'end_turn',
+    createMessage.mockResolvedValueOnce({
+      stopReason: 'end_turn',
       content: [{ type: 'text', text: 'Na ostatnim weekly omówiono...' }],
+      text: 'Na ostatnim weekly omówiono...',
+      usage: { inputTokens: 10, outputTokens: 5 },
+      provider: 'anthropic',
+      model: 'claude-sonnet-4-5-20250929',
     });
 
     const executors = {
@@ -76,25 +83,32 @@ describe('askClaudeWithTools', () => {
     );
 
     expect(result).toBe('Na ostatnim weekly omówiono...');
-    expect(createMock).toHaveBeenCalledTimes(2);
+    expect(createMessage).toHaveBeenCalledTimes(2);
     expect(executors.search_slack_history).toHaveBeenCalledWith({ query: 'weekly' });
   });
 
   it('po max rounds wywołuje Claude bez narzędzi', async () => {
-    const createMock = getCreateMock();
     // 3 rundy tool_use
     for (let i = 0; i < 3; i++) {
-      createMock.mockResolvedValueOnce({
-        stop_reason: 'tool_use',
+      createMessage.mockResolvedValueOnce({
+        stopReason: 'tool_use',
         content: [
           { type: 'tool_use', id: `call_${i}`, name: 'search_slack_history', input: { query: `q${i}` } },
         ],
+        text: '',
+        usage: { inputTokens: 10, outputTokens: 5 },
+        provider: 'anthropic',
+        model: 'claude-sonnet-4-5-20250929',
       });
     }
     // Finalne wywołanie bez tools
-    createMock.mockResolvedValueOnce({
-      stop_reason: 'end_turn',
+    createMessage.mockResolvedValueOnce({
+      stopReason: 'end_turn',
       content: [{ type: 'text', text: 'Podsumowanie' }],
+      text: 'Podsumowanie',
+      usage: { inputTokens: 10, outputTokens: 5 },
+      provider: 'anthropic',
+      model: 'claude-sonnet-4-5-20250929',
     });
 
     const executors = {
@@ -109,16 +123,20 @@ describe('askClaudeWithTools', () => {
 
     expect(result).toBe('Podsumowanie');
     // 3 rounds + 1 final = 4 calls
-    expect(createMock).toHaveBeenCalledTimes(4);
+    expect(createMessage).toHaveBeenCalledTimes(4);
     // Ostatnie wywołanie NIE ma tools
-    const lastCall = createMock.mock.calls[3][0];
+    const lastCall = createMessage.mock.calls[3][0];
     expect(lastCall).not.toHaveProperty('tools');
   });
 
   it('przekazuje tools z cache_control w wywołaniu API', async () => {
-    getCreateMock().mockResolvedValue({
-      stop_reason: 'end_turn',
+    createMessage.mockResolvedValue({
+      stopReason: 'end_turn',
       content: [{ type: 'text', text: 'OK' }],
+      text: 'OK',
+      usage: { inputTokens: 10, outputTokens: 5 },
+      provider: 'anthropic',
+      model: 'claude-sonnet-4-5-20250929',
     });
 
     await askClaudeWithTools(
@@ -127,7 +145,7 @@ describe('askClaudeWithTools', () => {
       'Jan',
     );
 
-    const callArgs = getCreateMock().mock.calls[0][0];
+    const callArgs = createMessage.mock.calls[0][0];
     expect(callArgs).toHaveProperty('tools');
     expect(callArgs.tools).toHaveLength(10);
     // Ostatnie narzędzie ma cache_control
@@ -136,9 +154,13 @@ describe('askClaudeWithTools', () => {
   });
 
   it('system prompt jest tablicą z cache_control', async () => {
-    getCreateMock().mockResolvedValue({
-      stop_reason: 'end_turn',
+    createMessage.mockResolvedValue({
+      stopReason: 'end_turn',
       content: [{ type: 'text', text: 'OK' }],
+      text: 'OK',
+      usage: { inputTokens: 10, outputTokens: 5 },
+      provider: 'anthropic',
+      model: 'claude-sonnet-4-5-20250929',
     });
 
     await askClaudeWithTools(
@@ -147,17 +169,21 @@ describe('askClaudeWithTools', () => {
       'Jan',
     );
 
-    const callArgs = getCreateMock().mock.calls[0][0];
+    const callArgs = createMessage.mock.calls[0][0];
     expect(Array.isArray(callArgs.system)).toBe(true);
     expect(callArgs.system).toHaveLength(2);
     expect(callArgs.system[0].cache_control).toEqual({ type: 'ephemeral' });
     expect(callArgs.system[1].cache_control).toBeUndefined();
   });
 
-  it('używa modelu Sonnet 4.5', async () => {
-    getCreateMock().mockResolvedValue({
-      stop_reason: 'end_turn',
+  it('używa tier smart', async () => {
+    createMessage.mockResolvedValue({
+      stopReason: 'end_turn',
       content: [{ type: 'text', text: 'OK' }],
+      text: 'OK',
+      usage: { inputTokens: 10, outputTokens: 5 },
+      provider: 'anthropic',
+      model: 'claude-sonnet-4-5-20250929',
     });
 
     await askClaudeWithTools(
@@ -166,8 +192,7 @@ describe('askClaudeWithTools', () => {
       'Jan',
     );
 
-    const callArgs = getCreateMock().mock.calls[0][0];
-    expect(callArgs.model).toContain('sonnet');
-    expect(callArgs.model).toBe('claude-sonnet-4-5-20250929');
+    const callArgs = createMessage.mock.calls[0][0];
+    expect(callArgs.tier).toBe('smart');
   });
 });

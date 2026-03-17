@@ -18,13 +18,10 @@ jest.mock('../src/services/pipedrive', () => ({
   searchDeals: jest.fn(),
   getDeal: jest.fn(),
 }));
-jest.mock('@anthropic-ai/sdk', () => {
-  return jest.fn().mockImplementation(() => ({
-    messages: {
-      create: jest.fn(),
-    },
-  }));
-});
+jest.mock('../src/services/llm', () => ({
+  ask: jest.fn(),
+  createMessage: jest.fn(),
+}));
 
 process.env.ANTHROPIC_API_KEY = 'test-key';
 process.env.DEAL_SALES_PREFIX = 'sales-';

@@ -1,6 +1,5 @@
 // src/proactive/proactiveClaudeCall.ts — Sonnet z tools i prompt caching (proaktywna wersja)
-import { anthropic } from '../services/anthropicClient.js';
-import { MODEL_SONNET } from '../services/models.js';
+import { createMessage } from '../services/llm.js';
 import { getToolDefinitionsWithCache } from '../services/tools.js';
 import { executeToolCalls, MAX_TOOL_ROUNDS } from '../services/toolExecutor.js';
 import { extractText } from '../services/claudeTools.js';
@@ -17,32 +16,30 @@ export async function askClaudeProactive(messages: MessageParam[], executors: To
   let currentMessages = [...messages];
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const response = await (anthropic.messages.create as any)({
-      model: MODEL_SONNET,
-      max_tokens: 512,
+    const response = await createMessage({
+      tier: 'smart',
+      maxTokens: 512,
       system: systemPrompt,
       tools,
       messages: currentMessages,
     });
 
-    if (response.stop_reason !== 'tool_use') {
-      return extractText(response);
+    if (response.stopReason !== 'tool_use') {
+      return extractText(response as any);
     }
 
-    const toolResults = await executeToolCalls(response, executors);
+    const toolResults = await executeToolCalls(response as any, executors);
     currentMessages.push({ role: 'assistant', content: response.content });
     currentMessages.push({ role: 'user', content: toolResults });
   }
 
   // Safety: finalne wywołanie bez tools
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const finalResponse = await (anthropic.messages.create as any)({
-    model: MODEL_SONNET,
-    max_tokens: 512,
+  const finalResponse = await createMessage({
+    tier: 'smart',
+    maxTokens: 512,
     system: systemPrompt,
     messages: currentMessages,
   });
 
-  return extractText(finalResponse);
+  return extractText(finalResponse as any);
 }

@@ -1,6 +1,5 @@
 // src/services/dealResolver.ts — mapowanie kanałów Slack na deale Pipedrive
-import { anthropic } from './anthropicClient.js';
-import { MODEL_HAIKU } from './models.js';
+import { ask } from './llm.js';
 import { searchDeals, getDeal } from './pipedrive.js';
 import { supabase } from './supabase.js';
 import { logError } from './errors.js';
@@ -70,14 +69,14 @@ export async function getChannelsForDeal(dealId: number): Promise<string[]> {
   }
 }
 
-// Wywołaj Haiku do ekstrakcji JSON
+// Wywołaj LLM (fast tier) do ekstrakcji JSON
 export async function llmExtractJson(prompt: string): Promise<Record<string, unknown>> {
-  const response = await anthropic.messages.create({
-    model: MODEL_HAIKU,
-    max_tokens: 256,
+  const text = await ask({
+    tier: 'fast',
+    maxTokens: 256,
     messages: [{ role: 'user', content: prompt }],
   });
-  return cleanLlmJson((response.content[0] as { text: string }).text);
+  return cleanLlmJson(text);
 }
 
 // Disambiguacja: LLM wybiera najlepszy deal z kandydatów

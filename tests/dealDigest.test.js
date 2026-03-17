@@ -35,11 +35,10 @@ jest.mock('../src/services/dealResolver', () => ({
   resolveThreadToDeal: jest.fn(),
   getChannelsForDeal: jest.fn(() => Promise.resolve([])),
 }));
-jest.mock('@anthropic-ai/sdk', () => {
-  return jest.fn().mockImplementation(() => ({
-    messages: { create: jest.fn() },
-  }));
-});
+jest.mock('../src/services/llm', () => ({
+  ask: jest.fn(),
+  createMessage: jest.fn(),
+}));
 
 process.env.ANTHROPIC_API_KEY = 'test-key';
 process.env.PIPEDRIVE_API_TOKEN = 'test-token';

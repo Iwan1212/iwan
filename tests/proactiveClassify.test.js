@@ -1,15 +1,11 @@
-// Testy Haiku gatekeepera
-jest.mock('@anthropic-ai/sdk', () => {
-  const createMock = jest.fn();
-  return jest.fn().mockImplementation(() => ({
-    messages: { create: createMock },
-  }));
-});
+// Testy Haiku gatekeepera (przez zunifikowany LLM)
+jest.mock('../src/services/llm', () => ({
+  ask: jest.fn(),
+  createMessage: jest.fn(),
+}));
 
-const Anthropic = require('@anthropic-ai/sdk');
+const { ask } = require('../src/services/llm');
 const { shouldIwanRespond, parseGatekeeperResponse } = require('../src/proactive/proactiveClassify');
-
-const getCreateMock = () => new Anthropic().messages.create;
 
 describe('parseGatekeeperResponse', () => {
   const original = process.env;
@@ -56,42 +52,36 @@ describe('shouldIwanRespond', () => {
   beforeEach(() => {
     process.env = { ...original };
     process.env.PROACTIVE_CONFIDENCE_THRESHOLD = '0.7';
-    getCreateMock().mockReset();
+    ask.mockReset();
   });
 
   afterAll(() => {
     process.env = original;
   });
 
-  it('woła Haiku i parsuje odpowiedź', async () => {
-    getCreateMock().mockResolvedValue({
-      content: [{ text: 'DECISION: tak\nCONFIDENCE: 0.9\nREASON: Pytanie o urlopy' }],
-    });
+  it('woła LLM i parsuje odpowiedź', async () => {
+    ask.mockResolvedValue('DECISION: tak\nCONFIDENCE: 0.9\nREASON: Pytanie o urlopy');
 
     const result = await shouldIwanRespond('kto jest na urlopie?', 'topic:urlopy');
     expect(result.should).toBe(true);
     expect(result.confidence).toBe(0.9);
   });
 
-  it('używa modelu Haiku', async () => {
-    getCreateMock().mockResolvedValue({
-      content: [{ text: 'DECISION: nie\nCONFIDENCE: 0.8\nREASON: Nie' }],
-    });
+  it('używa tier fast', async () => {
+    ask.mockResolvedValue('DECISION: nie\nCONFIDENCE: 0.8\nREASON: Nie');
 
     await shouldIwanRespond('test', 'test');
-    expect(getCreateMock()).toHaveBeenCalledWith(
-      expect.objectContaining({ model: expect.stringContaining('haiku') })
+    expect(ask).toHaveBeenCalledWith(
+      expect.objectContaining({ tier: 'fast' })
     );
   });
 
-  it('ustawia max_tokens na 100', async () => {
-    getCreateMock().mockResolvedValue({
-      content: [{ text: 'DECISION: nie\nCONFIDENCE: 0.3\nREASON: Nie' }],
-    });
+  it('ustawia maxTokens na 100', async () => {
+    ask.mockResolvedValue('DECISION: nie\nCONFIDENCE: 0.3\nREASON: Nie');
 
     await shouldIwanRespond('test', 'test');
-    expect(getCreateMock()).toHaveBeenCalledWith(
-      expect.objectContaining({ max_tokens: 100 })
+    expect(ask).toHaveBeenCalledWith(
+      expect.objectContaining({ maxTokens: 100 })
     );
   });
 });

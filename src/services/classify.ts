@@ -1,16 +1,15 @@
 // src/services/classify.ts
-import { anthropic } from './anthropicClient.js';
-import { MODEL_HAIKU } from './models.js';
+import { ask } from './llm.js';
 
-// Klasyfikuj wiadomość użytkownika (haiku — tani i szybki)
+// Klasyfikuj wiadomość użytkownika (fast tier — tani i szybki)
 export async function classifyMessage(text: string): Promise<string> {
-  const response = await anthropic.messages.create({
-    model: MODEL_HAIKU,
-    max_tokens: 50,
+  const result = await ask({
+    tier: 'fast',
+    maxTokens: 50,
     messages: [{
       role: 'user',
       content: `Sklasyfikuj tę wiadomość jako jedno z: pytanie-ogolne, pytanie-techniczne, small-talk, spam. Odpowiedz JEDNYM słowem.\n\nWiadomość: "${text}"`,
     }],
   });
-  return (response.content[0] as { text: string }).text.trim().toLowerCase();
+  return result.trim().toLowerCase();
 }
