@@ -12,7 +12,7 @@ Open-source AI agent Slack. Crawluje wiadomości z kanałów, odpowiada na pytan
 - Hosting: Railway
 - Docker: Node 20 Alpine, multi-stage build (tsc → dist/)
 - CI: GitHub Actions (npm ci, npm run typecheck, npm test)
-- Testy: Jest 29 (ts-jest), 39 suites, 363 assertions
+- Testy: Jest 29 (ts-jest), 40 suites, 386 assertions
 - Pliki: 42 źródłowe (.ts), 39 testów (.js)
 
 ## Upgrade Plan v0.5 → v1.0 (OpenViktor level)
@@ -23,7 +23,7 @@ Cel: 7.5/10+ — kolejność faz: resilience → features → optymalizacja → 
 | 0 | Docker + CI/CD | DONE |
 | 1 | TypeScript migration | DONE |
 | 2 | Multi-Provider LLM | do zrobienia |
-| 3 | Write Tools (Notion, Slack, Pipedrive) | do zrobienia |
+| 3 | Write Tools (Pipedrive + Slack) | DONE |
 | 4 | Redis Cache | do zrobienia |
 | 5 | Proactive 2.0 (cron, digest, anomaly) | do zrobienia |
 | 6 | Dashboard + Monorepo | do zrobienia |
@@ -50,7 +50,7 @@ Rules: common/* (9 plików), typescript/* (5 plików)
 - Klient API: src/services/pipedrive.ts (search, get, notes, activities)
 - Deal resolver: src/services/dealResolver.ts (Slack kanał → Pipedrive deal, cache w Supabase)
 - Daily digest: src/services/dealDigest.ts (Pn-Pt, automatyczne podsumowania → Pipedrive notes)
-- Narzędzia Claude: search_pipedrive, deal_status (w tools.ts + toolExecutor.ts)
+- Narzędzia Claude: search_pipedrive, deal_status, create_deal_note, create_deal_activity, send_slack_message (w tools.ts + toolExecutor.ts)
 - Slash commands: /iwan deal <name>, /iwan deals
 - Backfill: scripts/backfillDeals.js (--days N, --dry-run, --deal "Acme")
 - Knowledge system: knowledge/*.md → injected do LLM prompts (src/services/knowledge.ts)

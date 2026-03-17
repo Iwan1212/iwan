@@ -6,7 +6,7 @@ import { searchNotion, buildContextFromNotion } from './notion.js';
 import { buildDateRange, getTimeline, buildContextFromWorkforce } from './workforce.js';
 import { getAbsences, buildCalamariDateRange, buildContextFromCalamari } from './calamari.js';
 import { getEvents, buildCalendarDateRange, buildContextFromCalendar, createCalendarEvent } from './calendar.js';
-import { searchDeals, getDeal, getDealNotes, buildContextFromDeal, buildContextFromDeals } from './pipedrive.js';
+import { searchDeals, getDeal, getDealNotes, buildContextFromDeal, buildContextFromDeals, createNote, createActivity } from './pipedrive.js';
 import { resolveUserNames } from './users.js';
 import { logError } from './errors.js';
 import type { ToolExecutors, ToolResult } from '../types/index.js';
@@ -151,6 +151,35 @@ export function createToolExecutors(app: SlackApp, channelId: string, threadTs: 
       if (!deal) return 'Nie znaleziono deala o podanym ID.';
       const notes = await getDealNotes(deal_id as number);
       return buildContextFromDeal(deal, notes);
+    },
+
+    create_deal_note: async ({ deal_id, content, pinned }) => {
+      const note = await createNote(deal_id as number, content as string, Boolean(pinned));
+      if (!note) return 'Błąd: nie udało się utworzyć notatki.';
+      return `Utworzono notatkę na dealu ${deal_id} (note_id=${note.id}).`;
+    },
+
+    create_deal_activity: async ({ deal_id, subject, type, due_date }) => {
+      const activity = await createActivity(
+        deal_id as number, subject as string,
+        (type as string) || 'task', (due_date as string) || null,
+      );
+      if (!activity) return 'Błąd: nie udało się utworzyć aktywności.';
+      return `Utworzono aktywność "${subject}" na dealu ${deal_id} (activity_id=${activity.id}).`;
+    },
+
+    send_slack_message: async ({ channel, text, thread_ts }) => {
+      try {
+        await app.client.chat.postMessage({
+          channel: channel as string,
+          text: text as string,
+          ...(thread_ts ? { thread_ts: thread_ts as string } : {}),
+        });
+        return `Wiadomość wysłana na kanał ${channel}.`;
+      } catch (error) {
+        logError('toolExecutor', 'Błąd wysyłania wiadomości Slack', (error as Error).message);
+        return `Błąd wysyłania wiadomości: ${(error as Error).message}`;
+      }
     },
   };
 }

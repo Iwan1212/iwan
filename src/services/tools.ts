@@ -96,6 +96,46 @@ export function getToolDefinitions(): ToolDefinition[] {
         required: ['title', 'start_datetime', 'end_datetime'],
       },
     },
+    {
+      name: 'create_deal_note',
+      description: 'Utwórz notatkę na dealu w Pipedrive CRM. Używaj gdy użytkownik chce zapisać podsumowanie rozmowy, decyzję, notatki ze spotkania na konkretnym dealu. WAŻNE: Wymaga ID deala — najpierw użyj search_pipedrive.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          deal_id: { type: 'number', description: 'ID deala w Pipedrive' },
+          content: { type: 'string', description: 'Treść notatki (HTML dozwolone, np. <b>bold</b>, <br> dla nowych linii)' },
+          pinned: { type: 'boolean', description: 'Czy przypiąć notatkę do deala (domyślnie false)' },
+        },
+        required: ['deal_id', 'content'],
+      },
+    },
+    {
+      name: 'create_deal_activity',
+      description: 'Utwórz zadanie/aktywność powiązaną z dealem w Pipedrive CRM. Używaj gdy użytkownik chce dodać follow-up, task, przypomnienie na dealu.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          deal_id: { type: 'number', description: 'ID deala w Pipedrive' },
+          subject: { type: 'string', description: 'Tytuł zadania/aktywności' },
+          type: { type: 'string', description: 'Typ aktywności: task, call, meeting, email (domyślnie task)' },
+          due_date: { type: 'string', description: 'Termin w formacie YYYY-MM-DD (opcjonalne)' },
+        },
+        required: ['deal_id', 'subject'],
+      },
+    },
+    {
+      name: 'send_slack_message',
+      description: 'Wyślij wiadomość na kanał Slack. Używaj gdy użytkownik prosi o wysłanie podsumowania, statusu lub informacji na inny kanał. Podaj ID kanału (np. C123) lub nazwę (np. #general).',
+      input_schema: {
+        type: 'object',
+        properties: {
+          channel: { type: 'string', description: 'ID kanału Slack (np. C04ABCDEF) lub nazwa kanału (np. #general)' },
+          text: { type: 'string', description: 'Treść wiadomości (Slack mrkdwn format)' },
+          thread_ts: { type: 'string', description: 'Timestamp wątku do odpowiedzi (opcjonalne)' },
+        },
+        required: ['channel', 'text'],
+      },
+    },
   ];
 }
 

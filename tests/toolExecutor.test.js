@@ -24,6 +24,15 @@ jest.mock('../src/services/users', () => ({
   resolveUserNames: jest.fn(),
   getUserName: jest.fn(),
 }));
+jest.mock('../src/services/pipedrive', () => ({
+  searchDeals: jest.fn(),
+  getDeal: jest.fn(),
+  getDealNotes: jest.fn(),
+  buildContextFromDeal: jest.fn(),
+  buildContextFromDeals: jest.fn(),
+  createNote: jest.fn(),
+  createActivity: jest.fn(),
+}));
 
 const { createToolExecutors, executeToolCalls, MAX_TOOL_ROUNDS } = require('../src/services/toolExecutor');
 const { searchSlackHistory, buildContextFromMessages } = require('../src/services/search');
@@ -31,6 +40,7 @@ const { searchNotion, buildContextFromNotion } = require('../src/services/notion
 const { buildDateRange, getTimeline, buildContextFromWorkforce } = require('../src/services/workforce');
 const { getEvents, buildCalendarDateRange, buildContextFromCalendar, createCalendarEvent } = require('../src/services/calendar');
 const { resolveUserNames, getUserName } = require('../src/services/users');
+const { createNote, createActivity } = require('../src/services/pipedrive');
 
 describe('createToolExecutors', () => {
   const mockApp = {};
@@ -39,7 +49,7 @@ describe('createToolExecutors', () => {
 
   beforeEach(() => jest.clearAllMocks());
 
-  it('zwraca obiekt z 8 executorami', () => {
+  it('zwraca obiekt z 13 executorami', () => {
     const executors = createToolExecutors(mockApp, channelId, threadTs);
     expect(executors).toHaveProperty('read_thread');
     expect(executors).toHaveProperty('read_channel');
@@ -49,6 +59,11 @@ describe('createToolExecutors', () => {
     expect(executors).toHaveProperty('search_calamari');
     expect(executors).toHaveProperty('search_calendar');
     expect(executors).toHaveProperty('create_event');
+    expect(executors).toHaveProperty('search_pipedrive');
+    expect(executors).toHaveProperty('deal_status');
+    expect(executors).toHaveProperty('create_deal_note');
+    expect(executors).toHaveProperty('create_deal_activity');
+    expect(executors).toHaveProperty('send_slack_message');
   });
 
   it('read_thread pobiera wiadomości z wątku via Slack API', async () => {
@@ -153,6 +168,99 @@ describe('createToolExecutors', () => {
       description: 'Sprint planning',
     });
     expect(result).toContain('Planning');
+  });
+
+  it('create_deal_note woła createNote i zwraca potwierdzenie', async () => {
+    createNote.mockResolvedValue({ id: 999 });
+
+    const executors = createToolExecutors(mockApp, channelId, threadTs);
+    const result = await executors.create_deal_note({ deal_id: 42, content: '<b>Notatka</b>', pinned: true });
+
+    expect(createNote).toHaveBeenCalledWith(42, '<b>Notatka</b>', true);
+    expect(result).toContain('Utworzono notatkę');
+    expect(result).toContain('note_id=999');
+  });
+
+  it('create_deal_note zwraca błąd gdy createNote zwraca null', async () => {
+    createNote.mockResolvedValue(null);
+
+    const executors = createToolExecutors(mockApp, channelId, threadTs);
+    const result = await executors.create_deal_note({ deal_id: 42, content: 'test' });
+
+    expect(result).toContain('Błąd');
+  });
+
+  it('create_deal_activity woła createActivity i zwraca potwierdzenie', async () => {
+    createActivity.mockResolvedValue({ id: 555 });
+
+    const executors = createToolExecutors(mockApp, channelId, threadTs);
+    const result = await executors.create_deal_activity({
+      deal_id: 42, subject: 'Follow-up', type: 'call', due_date: '2026-03-20',
+    });
+
+    expect(createActivity).toHaveBeenCalledWith(42, 'Follow-up', 'call', '2026-03-20');
+    expect(result).toContain('Utworzono aktywność');
+    expect(result).toContain('activity_id=555');
+  });
+
+  it('create_deal_activity używa domyślnych wartości type i due_date', async () => {
+    createActivity.mockResolvedValue({ id: 556 });
+
+    const executors = createToolExecutors(mockApp, channelId, threadTs);
+    await executors.create_deal_activity({ deal_id: 10, subject: 'Task' });
+
+    expect(createActivity).toHaveBeenCalledWith(10, 'Task', 'task', null);
+  });
+
+  it('create_deal_activity zwraca błąd gdy createActivity zwraca null', async () => {
+    createActivity.mockResolvedValue(null);
+
+    const executors = createToolExecutors(mockApp, channelId, threadTs);
+    const result = await executors.create_deal_activity({ deal_id: 42, subject: 'Test' });
+
+    expect(result).toContain('Błąd');
+  });
+
+  it('send_slack_message woła chat.postMessage i zwraca potwierdzenie', async () => {
+    const mockAppSlack = {
+      client: { chat: { postMessage: jest.fn().mockResolvedValue({ ok: true }) } },
+    };
+
+    const executors = createToolExecutors(mockAppSlack, channelId, threadTs);
+    const result = await executors.send_slack_message({ channel: 'C04ABC', text: 'Hello team!' });
+
+    expect(mockAppSlack.client.chat.postMessage).toHaveBeenCalledWith({
+      channel: 'C04ABC',
+      text: 'Hello team!',
+    });
+    expect(result).toContain('Wiadomość wysłana');
+  });
+
+  it('send_slack_message przekazuje thread_ts gdy podany', async () => {
+    const mockAppSlack = {
+      client: { chat: { postMessage: jest.fn().mockResolvedValue({ ok: true }) } },
+    };
+
+    const executors = createToolExecutors(mockAppSlack, channelId, threadTs);
+    await executors.send_slack_message({ channel: 'C04ABC', text: 'Reply', thread_ts: '111.222' });
+
+    expect(mockAppSlack.client.chat.postMessage).toHaveBeenCalledWith({
+      channel: 'C04ABC',
+      text: 'Reply',
+      thread_ts: '111.222',
+    });
+  });
+
+  it('send_slack_message zwraca błąd gdy postMessage rzuca wyjątek', async () => {
+    const mockAppSlack = {
+      client: { chat: { postMessage: jest.fn().mockRejectedValue(new Error('channel_not_found')) } },
+    };
+
+    const executors = createToolExecutors(mockAppSlack, channelId, threadTs);
+    const result = await executors.send_slack_message({ channel: 'C_BAD', text: 'test' });
+
+    expect(result).toContain('Błąd wysyłania');
+    expect(result).toContain('channel_not_found');
   });
 });
 

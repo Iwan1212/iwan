@@ -2,10 +2,10 @@
 const { getToolDefinitions, getToolDefinitionsWithCache } = require('../src/services/tools');
 
 describe('getToolDefinitions', () => {
-  it('zwraca tablicę 7 narzędzi', () => {
+  it('zwraca tablicę 13 narzędzi', () => {
     const tools = getToolDefinitions();
     expect(Array.isArray(tools)).toBe(true);
-    expect(tools).toHaveLength(10);
+    expect(tools).toHaveLength(13);
   });
 
   it('każde narzędzie ma wymagane pola Anthropic API', () => {
@@ -18,7 +18,7 @@ describe('getToolDefinitions', () => {
     }
   });
 
-  it('zawiera read_thread, search_slack_history, search_notion, search_workforce, search_calamari, search_calendar, create_event', () => {
+  it('zawiera wszystkie 13 narzędzi', () => {
     const names = getToolDefinitions().map(t => t.name);
     expect(names).toContain('read_thread');
     expect(names).toContain('read_channel');
@@ -30,6 +30,9 @@ describe('getToolDefinitions', () => {
     expect(names).toContain('create_event');
     expect(names).toContain('search_pipedrive');
     expect(names).toContain('deal_status');
+    expect(names).toContain('create_deal_note');
+    expect(names).toContain('create_deal_activity');
+    expect(names).toContain('send_slack_message');
   });
 
   it('read_thread nie wymaga parametrów', () => {
@@ -52,13 +55,38 @@ describe('getToolDefinitions', () => {
     expect(createEvent.input_schema.properties).toHaveProperty('attendees');
     expect(createEvent.input_schema.properties).toHaveProperty('description');
   });
+
+  it('create_deal_note wymaga deal_id i content', () => {
+    const tool = getToolDefinitions().find(t => t.name === 'create_deal_note');
+    expect(tool.input_schema.required).toEqual(['deal_id', 'content']);
+    expect(tool.input_schema.properties).toHaveProperty('deal_id');
+    expect(tool.input_schema.properties).toHaveProperty('content');
+    expect(tool.input_schema.properties).toHaveProperty('pinned');
+  });
+
+  it('create_deal_activity wymaga deal_id i subject', () => {
+    const tool = getToolDefinitions().find(t => t.name === 'create_deal_activity');
+    expect(tool.input_schema.required).toEqual(['deal_id', 'subject']);
+    expect(tool.input_schema.properties).toHaveProperty('deal_id');
+    expect(tool.input_schema.properties).toHaveProperty('subject');
+    expect(tool.input_schema.properties).toHaveProperty('type');
+    expect(tool.input_schema.properties).toHaveProperty('due_date');
+  });
+
+  it('send_slack_message wymaga channel i text', () => {
+    const tool = getToolDefinitions().find(t => t.name === 'send_slack_message');
+    expect(tool.input_schema.required).toEqual(['channel', 'text']);
+    expect(tool.input_schema.properties).toHaveProperty('channel');
+    expect(tool.input_schema.properties).toHaveProperty('text');
+    expect(tool.input_schema.properties).toHaveProperty('thread_ts');
+  });
 });
 
 describe('getToolDefinitionsWithCache', () => {
-  it('zwraca tablicę 8 narzędzi', () => {
+  it('zwraca tablicę 13 narzędzi', () => {
     const tools = getToolDefinitionsWithCache();
     expect(Array.isArray(tools)).toBe(true);
-    expect(tools).toHaveLength(10);
+    expect(tools).toHaveLength(13);
   });
 
   it('ostatnie narzędzie ma cache_control', () => {
@@ -84,7 +112,7 @@ describe('getToolDefinitionsWithCache', () => {
   it('zachowuje wszystkie pola ostatniego narzędzia', () => {
     const tools = getToolDefinitionsWithCache();
     const last = tools[tools.length - 1];
-    expect(last).toHaveProperty('name', 'create_event');
+    expect(last).toHaveProperty('name', 'send_slack_message');
     expect(last).toHaveProperty('description');
     expect(last).toHaveProperty('input_schema');
   });
