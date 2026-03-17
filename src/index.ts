@@ -1,28 +1,31 @@
-// src/index.js — punkt wejścia aplikacji Iwan
-require('dotenv').config();
-const { App } = require('@slack/bolt');
-const { askClaude, askClaudeWithHistory, askClaudeWithContext } = require('./services/claude');
-const { searchSlackHistory, buildContextFromMessages } = require('./services/search');
-const { searchNotion, buildContextFromNotion } = require('./services/notion');
-const { searchWorkforce, buildContextFromWorkforce, shouldQueryWorkforce } = require('./services/workforce');
-const { askClaudeWithTools } = require('./services/claudeTools');
-const { askHaiku } = require('./services/claudeHaiku');
-const { createToolExecutors } = require('./services/toolExecutor');
+// src/index.ts — punkt wejścia aplikacji Iwan
+import 'dotenv/config';
+import { App } from '@slack/bolt';
+import { askClaude, askClaudeWithHistory, askClaudeWithContext } from './services/claude.js';
+import { searchSlackHistory, buildContextFromMessages } from './services/search.js';
+import { searchNotion, buildContextFromNotion } from './services/notion.js';
+import { searchWorkforce, buildContextFromWorkforce, shouldQueryWorkforce } from './services/workforce.js';
+import { askClaudeWithTools } from './services/claudeTools.js';
+import { askHaiku } from './services/claudeHaiku.js';
+import { createToolExecutors } from './services/toolExecutor.js';
 
 const useTools = process.env.ENABLE_TOOL_USE === 'true';
-const { setupWorkforceAlerts, setupWeeklySummary } = require('./services/workforceAlerts');
-const { setupDealDigest } = require('./services/dealDigest');
-const { validateMessage } = require('./services/validate');
-const { checkRateLimit } = require('./services/ratelimit');
-const { classifyMessage } = require('./services/classify');
-const { saveMessage, getHistory } = require('./services/memory');
-const { setupCrawler } = require('./crawler/listener');
-const { setupBackfillTrigger } = require('./crawler/backfillTrigger');
-const { toSlackMarkdown } = require('./services/format');
-const { resolveUserNames, getUserName } = require('./services/users');
-const { getCompanyContext } = require('./services/context');
-const { setupSlashCommand } = require('./handlers/slash');
-const { setupApprovalActions } = require('./handlers/approvalFlow');
+import { setupWorkforceAlerts, setupWeeklySummary } from './services/workforceAlerts.js';
+import { setupDealDigest } from './services/dealDigest.js';
+import { validateMessage } from './services/validate.js';
+import { checkRateLimit } from './services/ratelimit.js';
+import { classifyMessage } from './services/classify.js';
+import { saveMessage, getHistory } from './services/memory.js';
+import { setupCrawler } from './crawler/listener.js';
+import { setupBackfillTrigger } from './crawler/backfillTrigger.js';
+import { toSlackMarkdown } from './services/format.js';
+import { resolveUserNames, getUserName } from './services/users.js';
+import { getCompanyContext } from './services/context.js';
+import { setupSlashCommand } from './handlers/slash.js';
+import { setupApprovalActions } from './handlers/approvalFlow.js';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SlackApp = any;
 
 // Inicjalizacja aplikacji Slack w trybie Socket Mode
 const app = new App({
@@ -32,7 +35,8 @@ const app = new App({
 });
 
 // Helper: zapisz, sformatuj, wyślij odpowiedź i zmień reakcje
-async function sendReply({ app, event, threadTs, tekst, odpowiedz, mentionedUsers, say }) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function sendReply({ app, event, threadTs, tekst, odpowiedz, mentionedUsers, say }: { app: any; event: any; threadTs: string; tekst: string; odpowiedz: string; mentionedUsers: Map<string, string>; say: any }): Promise<void> {
   await saveMessage(event.channel, threadTs, event.user, 'user', tekst);
   await saveMessage(event.channel, threadTs, 'iwan', 'assistant', odpowiedz);
   let sformatowana = toSlackMarkdown(odpowiedz);
@@ -48,7 +52,8 @@ async function sendReply({ app, event, threadTs, tekst, odpowiedz, mentionedUser
 }
 
 // Obsługa wzmianek @Iwan — z guardrails
-app.event('app_mention', async ({ event, say, context }) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+app.event('app_mention', async ({ event, say, context }: any) => {
   const botUserId = context.botUserId || '';
 
   // Zamień mentions na imiona: <@U123|Jan> → Jan, <@UBOT> → usuń, <@UINNY> → imię
@@ -58,7 +63,7 @@ app.event('app_mention', async ({ event, say, context }) => {
   // Zamień pozostałe mentions: bota usuń, innych zamień na imię
   const mentionPattern = /<@([A-Z0-9]+)>/g;
   const mentions = [...tekst.matchAll(mentionPattern)];
-  const mentionedUsers = new Map(); // imię → userId (do @mention w odpowiedzi)
+  const mentionedUsers = new Map<string, string>(); // imię → userId (do @mention w odpowiedzi)
   for (const match of mentions) {
     const userId = match[1];
     if (userId === botUserId) {
@@ -85,7 +90,7 @@ app.event('app_mention', async ({ event, say, context }) => {
   if (!limit.allowed) { await say(limit.error); return; }
 
   // 3. Klasyfikacja (pomiń dla zapytań workforce — krótkie frazy mogą być błędnie klasyfikowane)
-  let kategoria = null;
+  let kategoria: string | null = null;
   if (!shouldQueryWorkforce(tekst)) {
     kategoria = await classifyMessage(tekst);
     if (kategoria === 'spam') { await say('Nie mogę pomóc z tym zapytaniem.'); return; }
@@ -95,14 +100,14 @@ app.event('app_mention', async ({ event, say, context }) => {
   const threadTs = event.thread_ts || event.ts;
 
   // 4.5. Smart routing: small-talk bez obrazków → szybka odpowiedź Haiku
-  const hasImages = event.files && event.files.some(f => (f.mimetype || '').startsWith('image/'));
+  const hasImages = event.files && event.files.some((f: { mimetype?: string }) => (f.mimetype || '').startsWith('image/'));
   if (kategoria === 'small-talk' && !hasImages) {
     const userName = await getUserName(app, event.user);
-    let odpowiedz;
+    let odpowiedz: string;
     try {
       odpowiedz = await askHaiku([{ role: 'user', content: tekst }], userName);
     } catch (error) {
-      console.error('[iwan] Błąd Haiku:', error.message);
+      console.error('[iwan] Błąd Haiku:', (error as Error).message);
       odpowiedz = 'Stay hard! 💪';
     }
     await sendReply({ app, event, threadTs, tekst, odpowiedz, mentionedUsers, say });
@@ -115,12 +120,14 @@ app.event('app_mention', async ({ event, say, context }) => {
     getCompanyContext(tekst),
   ]);
   const historia = await getHistory(event.channel, threadTs);
-  const messages = historia.map(msg => ({ role: msg.role, content: msg.content }));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const messages: any[] = historia.map(msg => ({ role: msg.role, content: msg.content }));
 
   // Obsługa obrazków — pobierz i dodaj jako vision content (max 4MB)
   const MAX_IMAGE_SIZE = 4 * 1024 * 1024;
   const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-  const imageBlocks = [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const imageBlocks: any[] = [];
   if (event.files && event.files.length > 0) {
     for (const file of event.files.slice(0, 3)) {
       const mimeType = file.mimetype || '';
@@ -149,7 +156,7 @@ app.event('app_mention', async ({ event, say, context }) => {
             type: 'image',
             source: { type: 'base64', media_type: detectedType, data: base64 },
           });
-        } catch (e) { console.log(`[iwan] Błąd pobierania obrazka: ${e.message}`); }
+        } catch (e) { console.log(`[iwan] Błąd pobierania obrazka: ${(e as Error).message}`); }
       } else if (mimeType.startsWith('image/')) {
         console.log(`[iwan] Pominięto obrazek: ${file.name}, ${mimeType}, ${file.size} bajtów (za duży lub nieobsługiwany typ)`);
       }
@@ -163,7 +170,7 @@ app.event('app_mention', async ({ event, say, context }) => {
     messages.push({ role: 'user', content: tekst });
   }
 
-  let odpowiedz;
+  let odpowiedz: string;
   try {
     if (useTools) {
       // Nowy flow: Claude decyduje które źródła odpytać
@@ -191,15 +198,15 @@ app.event('app_mention', async ({ event, say, context }) => {
       }
     }
   } catch (error) {
-    console.error('[iwan] Błąd Claude API:', error.message);
+    console.error('[iwan] Błąd Claude API:', (error as Error).message);
     // Retry bez obrazków jeśli to błąd przetwarzania obrazu
-    if (imageBlocks.length > 0 && error.message.includes('image')) {
+    if (imageBlocks.length > 0 && (error as Error).message.includes('image')) {
       console.log('[iwan] Retry bez obrazków...');
       messages[messages.length - 1] = { role: 'user', content: tekst || 'Nie udało się przetworzyć obrazka.' };
       try {
         const executors = createToolExecutors(app, event.channel, threadTs);
         odpowiedz = await askClaudeWithTools(messages, executors, userName, companyContext);
-      } catch (e2) {
+      } catch (_e2) {
         odpowiedz = 'Przepraszam, coś poszło nie tak. Spróbuj ponownie.';
       }
     } else {
@@ -235,7 +242,7 @@ setupDealDigest(app);
   await app.start();
 
   // Włącz tryb proaktywny (po starcie, bo potrzebuje API)
-  const { setupProactive } = require('./proactive/setup');
+  const { setupProactive } = await import('./proactive/setup.js');
   await setupProactive(app);
 
   console.log('🤖 Iwan działa w Socket Mode!');

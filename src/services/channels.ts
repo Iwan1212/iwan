@@ -1,12 +1,15 @@
-// src/services/channels.js
+// src/services/channels.ts
 
-const { logError } = require('./errors');
+import { logError } from './errors.js';
 
-const channelCache = new Map();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SlackApp = any;
+
+const channelCache = new Map<string, string>();
 
 // Pobierz nazwę kanału z Slack API (z cache)
-async function getChannelName(app, channelId) {
-  if (channelCache.has(channelId)) return channelCache.get(channelId);
+export async function getChannelName(app: SlackApp, channelId: string): Promise<string> {
+  if (channelCache.has(channelId)) return channelCache.get(channelId)!;
 
   try {
     const result = await app.client.conversations.info({ channel: channelId });
@@ -14,9 +17,7 @@ async function getChannelName(app, channelId) {
     channelCache.set(channelId, name);
     return name;
   } catch (error) {
-    logError('channels', 'Błąd pobierania channel info', error.message);
+    logError('channels', 'Błąd pobierania channel info', (error as Error).message);
     return channelId;
   }
 }
-
-module.exports = { getChannelName };

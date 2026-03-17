@@ -1,9 +1,10 @@
-// src/services/validate.js
+// src/services/validate.ts
+import type { ValidationResult } from '../types/index.js';
 
 const MAX_LENGTH = 4000;
 
 // Sprawdź czy wiadomość jest poprawna
-function validateMessage(text) {
+export function validateMessage(text: string): ValidationResult {
   if (!text || text.trim().length === 0) {
     return { valid: false, error: 'Wiadomość jest pusta' };
   }
@@ -12,5 +13,3 @@ function validateMessage(text) {
   }
   return { valid: true, error: null };
 }
-
-module.exports = { validateMessage };

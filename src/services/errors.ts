@@ -1,8 +1,8 @@
-// src/services/errors.js
-const { supabase } = require('./supabase');
+// src/services/errors.ts
+import { supabase } from './supabase.js';
 
 // Zapisz błąd do Supabase + console.error
-async function logError(source, message, details = null) {
+export async function logError(source: string, message: string, details: string | null = null): Promise<void> {
   console.error(`[${source}] ${message}`, details || '');
 
   try {
@@ -12,8 +12,6 @@ async function logError(source, message, details = null) {
       details: details ? String(details) : null,
     });
   } catch (err) {
-    console.error('Błąd zapisu do error_logs:', err.message);
+    console.error('Błąd zapisu do error_logs:', (err as Error).message);
   }
 }
-
-module.exports = { logError };

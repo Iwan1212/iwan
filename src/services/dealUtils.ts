@@ -1,7 +1,7 @@
-// src/services/dealUtils.js — wspólne funkcje dla modułów deal
+// src/services/dealUtils.ts — wspólne funkcje dla modułów deal
 
 // Oczyść odpowiedź LLM z markdown code block i sparsuj JSON
-function cleanLlmJson(text) {
+export function cleanLlmJson(text: string): Record<string, unknown> {
   const trimmed = text.trim();
   const cleaned = trimmed.startsWith('```')
     ? trimmed.split('\n').slice(1, -1).join('\n')
@@ -10,14 +10,18 @@ function cleanLlmJson(text) {
 }
 
 // Z listy deali wybierz otwarte, fallback na wszystkie
-function preferOpenDeals(deals) {
-  const open = deals.filter(d => d.status === 'open');
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function preferOpenDeals(deals: any[]): any[] {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const open = deals.filter((d: any) => d.status === 'open');
   return open.length > 0 ? open : deals;
 }
 
 // Grupuj wiadomości po wątkach (thread_ts)
-function groupByThread(messages) {
-  const threads = {};
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function groupByThread(messages: any[]): Record<string, any[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const threads: Record<string, any[]> = {};
   for (const msg of messages) {
     const ts = msg.thread_ts || 'main';
     if (!threads[ts]) threads[ts] = [];
@@ -25,5 +29,3 @@ function groupByThread(messages) {
   }
   return threads;
 }
-
-module.exports = { cleanLlmJson, preferOpenDeals, groupByThread };

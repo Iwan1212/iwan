@@ -1,21 +1,24 @@
-// src/proactive/proactiveClaudeCall.js — Sonnet z tools i prompt caching (proaktywna wersja)
-const Anthropic = require('@anthropic-ai/sdk');
-const { MODEL_SONNET } = require('../services/models');
-const { getToolDefinitionsWithCache } = require('../services/tools');
-const { executeToolCalls, MAX_TOOL_ROUNDS } = require('../services/toolExecutor');
-const { extractText } = require('../services/claudeTools');
-const { buildProactiveSystemPrompt } = require('./proactivePrompt');
+// src/proactive/proactiveClaudeCall.ts — Sonnet z tools i prompt caching (proaktywna wersja)
+import { anthropic } from '../services/anthropicClient.js';
+import { MODEL_SONNET } from '../services/models.js';
+import { getToolDefinitionsWithCache } from '../services/tools.js';
+import { executeToolCalls, MAX_TOOL_ROUNDS } from '../services/toolExecutor.js';
+import { extractText } from '../services/claudeTools.js';
+import { buildProactiveSystemPrompt } from './proactivePrompt.js';
+import type { ToolExecutors } from '../types/index.js';
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type MessageParam = any;
 
 // Wyślij wiadomość do Claude w trybie proaktywnym (max 512 tokenów)
-async function askClaudeProactive(messages, executors, companyContext = '') {
+export async function askClaudeProactive(messages: MessageParam[], executors: ToolExecutors, companyContext = ''): Promise<string> {
   const tools = getToolDefinitionsWithCache();
   const systemPrompt = buildProactiveSystemPrompt(companyContext);
   let currentMessages = [...messages];
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-    const response = await client.messages.create({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const response = await (anthropic.messages.create as any)({
       model: MODEL_SONNET,
       max_tokens: 512,
       system: systemPrompt,
@@ -33,7 +36,8 @@ async function askClaudeProactive(messages, executors, companyContext = '') {
   }
 
   // Safety: finalne wywołanie bez tools
-  const finalResponse = await client.messages.create({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const finalResponse = await (anthropic.messages.create as any)({
     model: MODEL_SONNET,
     max_tokens: 512,
     system: systemPrompt,
@@ -42,5 +46,3 @@ async function askClaudeProactive(messages, executors, companyContext = '') {
 
   return extractText(finalResponse);
 }
-
-module.exports = { askClaudeProactive };

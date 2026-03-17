@@ -1,7 +1,7 @@
-// src/services/promptCache.js — system prompt z prompt caching (cache_control)
+// src/services/promptCache.ts — system prompt z prompt caching (cache_control)
 
 // Statyczna część prompta (osobowość, styl, reguły) — cachowana między wywołaniami
-const STATIC_SYSTEM_PROMPT = `Jesteś Iwan — asystent AI zespołu Momentum. Masz osobowość i charakter.
+export const STATIC_SYSTEM_PROMPT = `Jesteś Iwan — asystent AI zespołu Momentum. Masz osobowość i charakter.
 
 OSOBOWOŚĆ:
 Masz energię i mentalność Davida Gogginsa. Jesteś twardy, motywujący, nie akceptujesz wymówek.
@@ -45,17 +45,23 @@ ZASADY:
 - Jeśli kontekst z historii Slack zawiera tę samą treść co pytanie użytkownika — zignoruj ją, to duplikat bieżącej rozmowy.`;
 
 // Dodatkowa instrukcja o narzędziach (dołączana do statycznego bloku w wersji z tool use)
-const TOOL_INSTRUCTION = `
+export const TOOL_INSTRUCTION = `
 - Masz dostęp do narzędzi — używaj ich gdy potrzebujesz danych. Nie wywołuj narzędzi jeśli potrafisz odpowiedzieć bez nich.`;
 
+export interface CacheBlock {
+  type: 'text';
+  text: string;
+  cache_control?: { type: string };
+}
+
 // Zbuduj dynamiczną część prompta (data, userName, companyContext)
-function buildDynamicBlock(userName, companyContext) {
+function buildDynamicBlock(userName: string, companyContext: string): string {
   const today = new Date().toISOString().split('T')[0];
   return `\n- Dzisiejsza data: ${today}.\n- Aktualnie rozmawia z Tobą: ${userName}.${companyContext}`;
 }
 
 // Helper: zbuduj 2-blokową strukturę z cache_control
-function buildCachedBlocks(staticText, userName, companyContext) {
+function buildCachedBlocks(staticText: string, userName: string, companyContext: string): CacheBlock[] {
   return [
     { type: 'text', text: staticText, cache_control: { type: 'ephemeral' } },
     { type: 'text', text: buildDynamicBlock(userName, companyContext) },
@@ -63,18 +69,11 @@ function buildCachedBlocks(staticText, userName, companyContext) {
 }
 
 // Zbuduj system prompt z cache_control (wersja podstawowa, bez narzędzi)
-function buildCachedSystemPrompt(userName, companyContext) {
+export function buildCachedSystemPrompt(userName: string, companyContext: string): CacheBlock[] {
   return buildCachedBlocks(STATIC_SYSTEM_PROMPT, userName, companyContext);
 }
 
 // Zbuduj system prompt z cache_control (wersja z narzędziami)
-function buildCachedToolSystemPrompt(userName, companyContext) {
+export function buildCachedToolSystemPrompt(userName: string, companyContext: string): CacheBlock[] {
   return buildCachedBlocks(STATIC_SYSTEM_PROMPT + TOOL_INSTRUCTION, userName, companyContext);
 }
-
-module.exports = {
-  buildCachedSystemPrompt,
-  buildCachedToolSystemPrompt,
-  STATIC_SYSTEM_PROMPT,
-  TOOL_INSTRUCTION,
-};

@@ -1,12 +1,11 @@
-// src/services/dealResolver.js — mapowanie kanałów Slack na deale Pipedrive
-const Anthropic = require('@anthropic-ai/sdk');
-const { MODEL_HAIKU } = require('./models');
-const { searchDeals, getDeal } = require('./pipedrive');
-const { supabase } = require('./supabase');
-const { logError } = require('./errors');
-const { cleanLlmJson, preferOpenDeals } = require('./dealUtils');
+// src/services/dealResolver.ts — mapowanie kanałów Slack na deale Pipedrive
+import { anthropic } from './anthropicClient.js';
+import { MODEL_HAIKU } from './models.js';
+import { searchDeals, getDeal } from './pipedrive.js';
+import { supabase } from './supabase.js';
+import { logError } from './errors.js';
+import { cleanLlmJson, preferOpenDeals } from './dealUtils.js';
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const SALES_PREFIX = process.env.DEAL_SALES_PREFIX || 'sales-';
 
 // Prompt do wyciągnięcia nazwy firmy z wiadomości
@@ -30,7 +29,7 @@ Pick the deal that best matches. Prefer open deals over closed ones.
 Return ONLY valid JSON (no markdown): {"deal_id": <id or null>, "confidence": "high|medium|low", "reason": "brief explanation"}`;
 
 // Pobierz cached mapping z Supabase
-async function getCachedMapping(channelId) {
+export async function getCachedMapping(channelId: string): Promise<number | null> {
   try {
     const { data } = await supabase
       .from('deal_channel_mappings')
@@ -45,7 +44,7 @@ async function getCachedMapping(channelId) {
 }
 
 // Zapisz mapping do Supabase
-async function saveMappings(dealId, channelId, channelName) {
+export async function saveMappings(dealId: number, channelId: string, channelName: string | null): Promise<void> {
   try {
     await supabase.from('deal_channel_mappings').upsert({
       deal_id: dealId,
@@ -54,35 +53,36 @@ async function saveMappings(dealId, channelId, channelName) {
       resolved_at: new Date().toISOString(),
     }, { onConflict: 'deal_id,channel_id' });
   } catch (error) {
-    logError('dealResolver', 'Błąd zapisu mappingu', error.message);
+    logError('dealResolver', 'Błąd zapisu mappingu', (error as Error).message);
   }
 }
 
 // Znajdź kanały powiązane z dealem
-async function getChannelsForDeal(dealId) {
+export async function getChannelsForDeal(dealId: number): Promise<string[]> {
   try {
     const { data } = await supabase
       .from('deal_channel_mappings')
       .select('channel_id')
       .eq('deal_id', dealId);
-    return (data || []).map(r => r.channel_id);
+    return (data || []).map((r: { channel_id: string }) => r.channel_id);
   } catch {
     return [];
   }
 }
 
 // Wywołaj Haiku do ekstrakcji JSON
-async function llmExtractJson(prompt) {
-  const response = await client.messages.create({
+export async function llmExtractJson(prompt: string): Promise<Record<string, unknown>> {
+  const response = await anthropic.messages.create({
     model: MODEL_HAIKU,
     max_tokens: 256,
     messages: [{ role: 'user', content: prompt }],
   });
-  return cleanLlmJson(response.content[0].text);
+  return cleanLlmJson((response.content[0] as { text: string }).text);
 }
 
 // Disambiguacja: LLM wybiera najlepszy deal z kandydatów
-async function disambiguate(channelName, topic, deals, channelId) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function disambiguate(channelName: string, topic: string, deals: any[], channelId: string): Promise<any | null> {
   const dealsJson = JSON.stringify(
     deals.map(d => ({ id: d.id, title: d.title, org_name: d.org_name, status: d.status }))
   );
@@ -97,20 +97,21 @@ async function disambiguate(channelName, topic, deals, channelId) {
     if (result.deal_id && result.confidence !== 'low') {
       const matched = deals.find(d => d.id === result.deal_id);
       if (matched) {
-        await saveMappings(result.deal_id, channelId, channelName);
+        await saveMappings(result.deal_id as number, channelId, channelName);
         console.log(`[dealResolver] LLM: #${channelName} → deal '${matched.title}' (${result.confidence})`);
         return matched;
       }
     }
     return null;
   } catch (error) {
-    logError('dealResolver', 'Disambiguacja nieudana', error.message);
+    logError('dealResolver', 'Disambiguacja nieudana', (error as Error).message);
     return null;
   }
 }
 
 // Rozwiąż kanał #sales-* na deal Pipedrive
-async function resolveChannelToDeal(channelName, channelId) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function resolveChannelToDeal(channelName: string, channelId: string): Promise<any | null> {
   // 1. Sprawdź cache
   const cachedDealId = await getCachedMapping(channelId);
   if (cachedDealId) {
@@ -145,7 +146,8 @@ async function resolveChannelToDeal(channelName, channelId) {
 }
 
 // Rozwiąż wątek w shared channel na deal Pipedrive
-async function resolveThreadToDeal(messages, channelName, channelId, threadTs) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function resolveThreadToDeal(messages: any[], channelName: string, channelId: string, threadTs: string): Promise<any | null> {
   // 1. Sprawdź cache per thread
   const cachedDealId = await getCachedMapping(`${channelId}:${threadTs}`);
   if (cachedDealId) {
@@ -159,12 +161,12 @@ async function resolveThreadToDeal(messages, channelName, channelId, threadTs) {
   const firstText = messages[0].text || messages[0].message_text || '';
   if (!firstText.trim()) return null;
 
-  let searchTerm;
+  let searchTerm: string;
   try {
     const extraction = await llmExtractJson(ENTITY_PROMPT.replace('{text}', firstText));
-    searchTerm = (extraction.search_term || '').trim();
+    searchTerm = ((extraction.search_term as string) || '').trim();
   } catch (error) {
-    logError('dealResolver', 'Ekstrakcja encji nieudana', error.message);
+    logError('dealResolver', 'Ekstrakcja encji nieudana', (error as Error).message);
     return null;
   }
   if (!searchTerm) return null;
@@ -183,13 +185,3 @@ async function resolveThreadToDeal(messages, channelName, channelId, threadTs) {
 
   return disambiguate(channelName, firstText.substring(0, 200), candidates, `${channelId}:${threadTs}`);
 }
-
-module.exports = {
-  resolveChannelToDeal,
-  resolveThreadToDeal,
-  getChannelsForDeal,
-  getCachedMapping,
-  saveMappings,
-  llmExtractJson,
-  disambiguate,
-};

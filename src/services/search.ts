@@ -1,9 +1,10 @@
-// src/services/search.js
-const { supabase } = require('./supabase');
-const { logError } = require('./errors');
+// src/services/search.ts
+import { supabase } from './supabase.js';
+import { logError } from './errors.js';
+import type { SearchResult } from '../types/index.js';
 
 // Wyszukaj wiadomości w historii Slack (full-text search, tylko z danego kanału)
-async function searchSlackHistory(query, channelId, excludeThreadTs = null) {
+export async function searchSlackHistory(query: string, channelId: string, excludeThreadTs: string | null = null): Promise<SearchResult[]> {
   const { data, error } = await supabase
     .rpc('search_slack_messages', {
       search_query: query,
@@ -17,7 +18,7 @@ async function searchSlackHistory(query, channelId, excludeThreadTs = null) {
   }
 
   // Filtruj wiadomości z bieżącego wątku (unikaj halucynacji o "historii")
-  let results = data || [];
+  let results = (data || []) as SearchResult[];
   if (excludeThreadTs) {
     results = results.filter(msg => msg.thread_ts !== excludeThreadTs);
   }
@@ -25,7 +26,7 @@ async function searchSlackHistory(query, channelId, excludeThreadTs = null) {
 }
 
 // Zbuduj kontekst z wyników wyszukiwania
-function buildContextFromMessages(messages) {
+export function buildContextFromMessages(messages: SearchResult[]): string {
   if (messages.length === 0) return '';
 
   const context = messages.map(msg => {
@@ -35,5 +36,3 @@ function buildContextFromMessages(messages) {
 
   return `\n\nKONTEKST Z HISTORII SLACK (znalezione wiadomości z tego kanału):\n---\n${context}\n---\n`;
 }
-
-module.exports = { searchSlackHistory, buildContextFromMessages };

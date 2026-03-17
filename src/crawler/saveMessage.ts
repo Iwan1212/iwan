@@ -1,9 +1,20 @@
-// src/crawler/saveMessage.js
-const { supabase } = require('../services/supabase');
-const { logError } = require('../services/errors');
+// src/crawler/saveMessage.ts
+import { supabase } from '../services/supabase.js';
+import { logError } from '../services/errors.js';
+
+interface SlackEvent {
+  bot_id?: string;
+  text?: string;
+  channel: string;
+  user: string;
+  user_name?: string | null;
+  channel_name?: string | null;
+  thread_ts?: string | null;
+  ts: string;
+}
 
 // Zapisz nową wiadomość z kanału Slack do bazy
-async function saveSlackMessage(event) {
+export async function saveSlackMessage(event: SlackEvent): Promise<void> {
   // Ignoruj boty i wiadomości bez tekstu
   if (event.bot_id || !event.text) return;
 
@@ -21,5 +32,3 @@ async function saveSlackMessage(event) {
 
   if (error) logError('crawler', 'Błąd zapisu wiadomości', error.message);
 }
-
-module.exports = { saveSlackMessage };

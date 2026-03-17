@@ -1,12 +1,11 @@
-// src/services/claude.js
-const Anthropic = require('@anthropic-ai/sdk');
-const { MODEL_SONNET } = require('./models');
-const { STATIC_SYSTEM_PROMPT } = require('./promptCache');
-
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+// src/services/claude.ts
+import { anthropic } from './anthropicClient.js';
+import { MODEL_SONNET } from './models.js';
+import { STATIC_SYSTEM_PROMPT } from './promptCache.js';
+import type { ChatMessage } from '../types/index.js';
 
 // Zbuduj system prompt z imieniem rozmówcy i kontekstem firmowym
-function buildSystemPrompt(userName, companyContext) {
+function buildSystemPrompt(userName: string, companyContext: string): string {
   const today = new Date().toISOString().split('T')[0];
   return `${STATIC_SYSTEM_PROMPT}
 - Dzisiejsza data: ${today}.
@@ -14,37 +13,35 @@ function buildSystemPrompt(userName, companyContext) {
 }
 
 // Wyślij wiadomość do Claude i zwróć odpowiedź
-async function askClaude(userMessage, userName, companyContext = '') {
-  const response = await client.messages.create({
+export async function askClaude(userMessage: string, userName: string, companyContext = ''): Promise<string> {
+  const response = await anthropic.messages.create({
     model: MODEL_SONNET,
     max_tokens: 1024,
     system: buildSystemPrompt(userName, companyContext),
     messages: [{ role: 'user', content: userMessage }],
   });
-  return response.content[0].text;
+  return (response.content[0] as { text: string }).text;
 }
 
 // Wyślij wiadomość do Claude z historią rozmowy
-async function askClaudeWithHistory(messages, userName, companyContext = '') {
-  const response = await client.messages.create({
+export async function askClaudeWithHistory(messages: ChatMessage[], userName: string, companyContext = ''): Promise<string> {
+  const response = await anthropic.messages.create({
     model: MODEL_SONNET,
     max_tokens: 1024,
     system: buildSystemPrompt(userName, companyContext),
     messages: messages,
   });
-  return response.content[0].text;
+  return (response.content[0] as { text: string }).text;
 }
 
 // Wyślij wiadomość do Claude z kontekstem ze Slacka i historią rozmowy
-async function askClaudeWithContext(messages, slackContext, userName, companyContext = '') {
+export async function askClaudeWithContext(messages: ChatMessage[], slackContext: string, userName: string, companyContext = ''): Promise<string> {
   const systemWithContext = buildSystemPrompt(userName, companyContext) + slackContext;
-  const response = await client.messages.create({
+  const response = await anthropic.messages.create({
     model: MODEL_SONNET,
     max_tokens: 1024,
     system: systemWithContext,
     messages: messages,
   });
-  return response.content[0].text;
+  return (response.content[0] as { text: string }).text;
 }
-
-module.exports = { askClaude, askClaudeWithHistory, askClaudeWithContext };

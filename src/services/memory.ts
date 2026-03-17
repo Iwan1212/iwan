@@ -1,9 +1,10 @@
-// src/services/memory.js
-const { supabase } = require('./supabase');
-const { logError } = require('./errors');
+// src/services/memory.ts
+import { supabase } from './supabase.js';
+import { logError } from './errors.js';
+import type { ChatMessage } from '../types/index.js';
 
 // Zapisz wiadomość w historii rozmowy
-async function saveMessage(channelId, threadTs, userId, role, content) {
+export async function saveMessage(channelId: string, threadTs: string | null, userId: string, role: string, content: string): Promise<void> {
   const { error } = await supabase
     .from('conversations')
     .insert({
@@ -17,13 +18,12 @@ async function saveMessage(channelId, threadTs, userId, role, content) {
 }
 
 // Pobierz historię rozmowy z danego threadu
-async function getHistory(channelId, threadTs, limit = 10) {
+export async function getHistory(channelId: string, threadTs: string | null, limit = 10): Promise<ChatMessage[]> {
   let query = supabase
     .from('conversations')
     .select('role, content')
     .eq('channel_id', channelId);
 
-  // Null thread_ts = wiadomości z głównego kanału
   if (threadTs) {
     query = query.eq('thread_ts', threadTs);
   } else {
@@ -38,7 +38,5 @@ async function getHistory(channelId, threadTs, limit = 10) {
     logError('memory', 'Błąd pobierania historii', error.message);
     return [];
   }
-  return data || [];
+  return (data || []) as ChatMessage[];
 }
-
-module.exports = { saveMessage, getHistory };

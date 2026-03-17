@@ -1,11 +1,14 @@
-// src/proactive/proactiveRespond.js — generowanie i wysyłanie proaktywnej odpowiedzi
-const { askClaudeProactive } = require('./proactiveClaudeCall');
-const { createToolExecutors } = require('../services/toolExecutor');
-const { toSlackMarkdown } = require('../services/format');
-const { saveMessage } = require('../services/memory');
+// src/proactive/proactiveRespond.ts — generowanie i wysyłanie proaktywnej odpowiedzi
+import { askClaudeProactive } from './proactiveClaudeCall.js';
+import { createToolExecutors } from '../services/toolExecutor.js';
+import { toSlackMarkdown } from '../services/format.js';
+import { saveMessage } from '../services/memory.js';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SlackApp = any;
 
 // Zbuduj wiadomości dla Claude z kontekstem rozmowy
-function buildProactiveMessages(conversationText, triggerReason) {
+export function buildProactiveMessages(conversationText: string, triggerReason: string) {
   return [
     {
       role: 'user',
@@ -19,7 +22,7 @@ ${conversationText}`,
 }
 
 // Wygeneruj i wyślij proaktywną odpowiedź na Slack
-async function sendProactiveResponse(app, channelId, threadTs, conversationText, triggerReason, companyContext) {
+export async function sendProactiveResponse(app: SlackApp, channelId: string, threadTs: string, conversationText: string, triggerReason: string, companyContext: string): Promise<string | null> {
   const messages = buildProactiveMessages(conversationText, triggerReason);
   const executors = createToolExecutors(app, channelId, threadTs);
 
@@ -29,7 +32,7 @@ async function sendProactiveResponse(app, channelId, threadTs, conversationText,
   const sformatowana = toSlackMarkdown(odpowiedz);
 
   // Wyślij na Slack (w wątku jeśli threadTs, inaczej na kanał)
-  const postArgs = {
+  const postArgs: Record<string, string> = {
     channel: channelId,
     text: sformatowana,
   };
@@ -45,5 +48,3 @@ async function sendProactiveResponse(app, channelId, threadTs, conversationText,
   console.log(`[proactive] Wysłano odpowiedź na ${channelId}${threadTs ? ` (wątek ${threadTs})` : ''}`);
   return odpowiedz;
 }
-
-module.exports = { buildProactiveMessages, sendProactiveResponse };

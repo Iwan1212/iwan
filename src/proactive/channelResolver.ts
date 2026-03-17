@@ -1,17 +1,20 @@
-// src/proactive/channelResolver.js — resolving nazw kanałów na ID
-const { getProactiveChannelNames } = require('./config');
+// src/proactive/channelResolver.ts — resolving nazw kanałów na ID
+import { getProactiveChannelNames } from './config.js';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SlackApp = any;
 
 // Cache: name → id
-let channelMap = new Map();
+let channelMap = new Map<string, string>();
 
 // Rozwiąż nazwy kanałów na ID (raz przy starcie)
-async function resolveProactiveChannels(app) {
+export async function resolveProactiveChannels(app: SlackApp): Promise<void> {
   const names = getProactiveChannelNames();
   if (names.length === 0) return;
 
   try {
     const nameSet = new Set(names);
-    let cursor;
+    let cursor: string | undefined;
     let totalFetched = 0;
 
     // Paginacja — conversations.list może nie zwrócić wszystkich w jednym batchu
@@ -43,12 +46,12 @@ async function resolveProactiveChannels(app) {
       console.log(`[proactive] Nie znaleziono kanałów: ${missing.join(', ')} — sprawdź czy bot jest memberem`);
     }
   } catch (error) {
-    console.error('[proactive] Błąd resolving kanałów:', error.message);
+    console.error('[proactive] Błąd resolving kanałów:', (error as Error).message);
   }
 }
 
 // Sprawdź czy kanał jest proaktywny (po ID)
-function isProactiveChannel(channelId) {
+export function isProactiveChannel(channelId: string): boolean {
   for (const id of channelMap.values()) {
     if (id === channelId) return true;
   }
@@ -56,12 +59,10 @@ function isProactiveChannel(channelId) {
 }
 
 // Eksportuj do testów
-function _getChannelMap() {
+export function _getChannelMap(): Map<string, string> {
   return channelMap;
 }
 
-function _setChannelMap(map) {
+export function _setChannelMap(map: Map<string, string>): void {
   channelMap = map;
 }
-
-module.exports = { resolveProactiveChannels, isProactiveChannel, _getChannelMap, _setChannelMap };

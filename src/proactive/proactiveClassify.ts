@@ -1,13 +1,17 @@
-// src/proactive/proactiveClassify.js — Haiku gatekeeper: czy Iwan powinien się odezwać?
-const Anthropic = require('@anthropic-ai/sdk');
-const { MODEL_HAIKU } = require('../services/models');
-const { getProactiveConfig } = require('./config');
+// src/proactive/proactiveClassify.ts — Haiku gatekeeper: czy Iwan powinien się odezwać?
+import { anthropic } from '../services/anthropicClient.js';
+import { MODEL_HAIKU } from '../services/models.js';
+import { getProactiveConfig } from './config.js';
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+interface GatekeeperResult {
+  should: boolean;
+  confidence: number;
+  reason: string;
+}
 
 // Zapytaj Haiku czy Iwan powinien się odezwać
-async function shouldIwanRespond(conversationText, triggerReason) {
-  const response = await client.messages.create({
+export async function shouldIwanRespond(conversationText: string, triggerReason: string): Promise<GatekeeperResult> {
+  const response = await anthropic.messages.create({
     model: MODEL_HAIKU,
     max_tokens: 100,
     messages: [{
@@ -32,12 +36,12 @@ Zasady:
     }],
   });
 
-  const text = response.content[0].text.trim();
+  const text = (response.content[0] as { text: string }).text.trim();
   return parseGatekeeperResponse(text);
 }
 
 // Parsuj odpowiedź gatekeepera
-function parseGatekeeperResponse(text) {
+export function parseGatekeeperResponse(text: string): GatekeeperResult {
   const decisionMatch = text.match(/DECISION:\s*(tak|nie)/i);
   const confidenceMatch = text.match(/CONFIDENCE:\s*([\d.]+)/);
   const reasonMatch = text.match(/REASON:\s*(.+)/i);
@@ -54,5 +58,3 @@ function parseGatekeeperResponse(text) {
     reason,
   };
 }
-
-module.exports = { shouldIwanRespond, parseGatekeeperResponse };

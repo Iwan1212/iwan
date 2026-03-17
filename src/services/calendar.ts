@@ -1,7 +1,8 @@
-// src/services/calendar.js — integracja z Google Calendar API (Service Account)
+// src/services/calendar.ts — integracja z Google Calendar API (Service Account)
 
-const { google } = require('googleapis');
-const { logError } = require('./errors');
+import { google } from 'googleapis';
+import { logError } from './errors.js';
+import type { CalendarEvent, DateRange } from '../types/index.js';
 
 const CALENDAR_IDS = (process.env.GOOGLE_CALENDAR_IDS || '')
   .split(',')
@@ -10,7 +11,7 @@ const CALENDAR_IDS = (process.env.GOOGLE_CALENDAR_IDS || '')
 const TIMEZONE = process.env.GOOGLE_CALENDAR_TIMEZONE || 'Europe/Warsaw';
 
 // Dekoduj base64 env var → JSON credentials
-function parseServiceAccountKey() {
+export function parseServiceAccountKey(): Record<string, string> | null {
   const raw = process.env.GOOGLE_SERVICE_ACCOUNT_KEY || '';
   if (!raw) return null;
   try {
@@ -21,7 +22,7 @@ function parseServiceAccountKey() {
 }
 
 // Utwórz klienta Google Calendar API
-function createCalendarClient() {
+export function createCalendarClient() {
   const credentials = parseServiceAccountKey();
   if (!credentials) return null;
 
@@ -34,21 +35,24 @@ function createCalendarClient() {
   return google.calendar({ version: 'v3', auth });
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type CalendarItem = any;
+
 // Normalizuj event z API do prostego obiektu
-function normalizeEvent(item) {
+export function normalizeEvent(item: CalendarItem): CalendarEvent {
   return {
     title: item.summary || '(bez tytułu)',
     start: item.start?.dateTime || item.start?.date || '',
     end: item.end?.dateTime || item.end?.date || '',
     allDay: !item.start?.dateTime,
-    attendees: (item.attendees || []).map(a => a.email),
+    attendees: (item.attendees || []).map((a: { email: string }) => a.email),
     organizer: item.organizer?.email || '',
     status: item.status || '',
   };
 }
 
 // Pobierz wydarzenia z wszystkich kalendarzy w zakresie dat
-async function getEvents(startDate, endDate) {
+export async function getEvents(startDate: string, endDate: string): Promise<CalendarEvent[]> {
   const cal = createCalendarClient();
   if (!cal) return [];
   if (CALENDAR_IDS.length === 0) return [];
@@ -70,7 +74,7 @@ async function getEvents(startDate, endDate) {
         });
         return (res.data.items || []).map(normalizeEvent);
       } catch (error) {
-        logError('calendar', `Błąd pobierania z ${calendarId}`, error.message);
+        logError('calendar', `Błąd pobierania z ${calendarId}`, (error as Error).message);
         return [];
       }
     })
@@ -80,12 +84,11 @@ async function getEvents(startDate, endDate) {
 }
 
 // Formatuj czas eventu do czytelnej formy
-function formatEventTime(start, end) {
+export function formatEventTime(start: string, end: string): string {
   if (!start) return '';
-  // Cały dzień
   if (!start.includes('T')) return 'cały dzień';
 
-  const fmt = (iso) => {
+  const fmt = (iso: string) => {
     const d = new Date(iso);
     return d.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit', timeZone: TIMEZONE });
   };
@@ -94,7 +97,7 @@ function formatEventTime(start, end) {
 }
 
 // Polskie nazwy miesięcy → numer (do parsowania "w marcu", "w Q2")
-const MONTH_NAMES_MAP = {
+const MONTH_NAMES_MAP: Record<string, number> = {
   'styczeń': 1, 'styczniu': 1, 'styczen': 1, 'stycznia': 1,
   'luty': 2, 'lutym': 2, 'lutego': 2,
   'marzec': 3, 'marcu': 3, 'marca': 3,
@@ -110,7 +113,7 @@ const MONTH_NAMES_MAP = {
 };
 
 // Mapa polskich nazw dni tygodnia → getDay() (0=niedziela)
-const DAY_NAMES_MAP = {
+const DAY_NAMES_MAP: Record<string, number> = {
   'poniedziałek': 1, 'poniedzialek': 1,
   'wtorek': 2,
   'środa': 3, 'sroda': 3, 'środę': 3, 'srode': 3, 'środy': 3,
@@ -121,7 +124,7 @@ const DAY_NAMES_MAP = {
 };
 
 // Date → 'YYYY-MM-DD' (local timezone, nie UTC)
-function toDateStr(date) {
+function toDateStr(date: Date): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');
@@ -129,7 +132,7 @@ function toDateStr(date) {
 }
 
 // Poniedziałek danego tygodnia
-function getMonday(date) {
+function getMonday(date: Date): Date {
   const d = new Date(date);
   const day = d.getDay();
   const diff = day === 0 ? -6 : 1 - day;
@@ -138,7 +141,7 @@ function getMonday(date) {
 }
 
 // Najbliższy dzień tygodnia (od from włącznie)
-function findNextDayOfWeek(from, targetDay) {
+function findNextDayOfWeek(from: Date, targetDay: number): Date {
   const d = new Date(from);
   const current = d.getDay();
   let diff = targetDay - current;
@@ -148,18 +151,16 @@ function findNextDayOfWeek(from, targetDay) {
 }
 
 // Smart parser dat kalendarza — rozumie polskie wyrażenia czasowe
-function parseCalendarDate(text) {
+export function parseCalendarDate(text: string): DateRange {
   const lower = text.toLowerCase();
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // "dziś" / "dzisiaj" / "dzis"
   if (/(^|\s)(dzi[sś]|dzisiaj)(\s|$|[?!.,])/.test(lower)) {
     const d = toDateStr(today);
     return { startDate: d, endDate: d };
   }
 
-  // "pojutrze" (przed "jutro" żeby nie matchować "jutro" w "pojutrze")
   if (/\bpojutrze\b/.test(lower)) {
     const d = new Date(today);
     d.setDate(d.getDate() + 2);
@@ -167,7 +168,6 @@ function parseCalendarDate(text) {
     return { startDate: s, endDate: s };
   }
 
-  // "jutro"
   if (/\bjutro\b/.test(lower)) {
     const d = new Date(today);
     d.setDate(d.getDate() + 1);
@@ -175,7 +175,6 @@ function parseCalendarDate(text) {
     return { startDate: s, endDate: s };
   }
 
-  // "ten tydzień" / "tym tygodniu" / "tego tygodnia" / "bieżący tydzień"
   if (/\b(ten tydzień|tym tygodni|tego tygodni|bieżąc\w* tydzi)/i.test(lower)) {
     const mon = getMonday(today);
     const sun = new Date(mon);
@@ -183,7 +182,6 @@ function parseCalendarDate(text) {
     return { startDate: toDateStr(mon), endDate: toDateStr(sun) };
   }
 
-  // "przyszły/następny tydzień" + opcjonalny dzień
   const nextWeekMatch = lower.match(/\b(przysz[łl]\S*|nast[eę]pn\S*)\s+(tydzie[nń]|tygodn\S+)/);
   if (nextWeekMatch) {
     const nextMon = getMonday(today);
@@ -191,12 +189,11 @@ function parseCalendarDate(text) {
     const nextSun = new Date(nextMon);
     nextSun.setDate(nextSun.getDate() + 6);
 
-    // Szukaj dnia tygodnia w tekście
     for (const [name, dayNum] of Object.entries(DAY_NAMES_MAP)) {
       if (lower.includes(name)) {
         const target = new Date(nextMon);
-        let diff = dayNum - 1; // 1=poniedziałek offset od poniedziałku
-        if (dayNum === 0) diff = 6; // niedziela = +6 od poniedziałku
+        let diff = dayNum - 1;
+        if (dayNum === 0) diff = 6;
         target.setDate(target.getDate() + diff);
         const s = toDateStr(target);
         return { startDate: s, endDate: s };
@@ -206,7 +203,6 @@ function parseCalendarDate(text) {
     return { startDate: toDateStr(nextMon), endDate: toDateStr(nextSun) };
   }
 
-  // "przyszły/następny" + dzień tygodnia (bez "tydzień")
   const nextDayMatch = lower.match(/\b(przysz[łl]\S*|nast[eę]pn\S*)\s+/);
   if (nextDayMatch) {
     for (const [name, dayNum] of Object.entries(DAY_NAMES_MAP)) {
@@ -223,7 +219,6 @@ function parseCalendarDate(text) {
     }
   }
 
-  // Sam dzień tygodnia → najbliższy (od dziś)
   for (const [name, dayNum] of Object.entries(DAY_NAMES_MAP)) {
     if (lower.includes(name)) {
       const d = findNextDayOfWeek(today, dayNum);
@@ -232,7 +227,6 @@ function parseCalendarDate(text) {
     }
   }
 
-  // Kwartał: "Q1", "Q2", ...
   const qMatch = lower.match(/q(\d)/);
   if (qMatch) {
     const q = parseInt(qMatch[1]);
@@ -246,7 +240,6 @@ function parseCalendarDate(text) {
     return { startDate: startDate < todayStr ? todayStr : startDate, endDate };
   }
 
-  // Nazwa miesiąca: "w marcu", "spotkania w kwietniu"
   for (const [name, monthNum] of Object.entries(MONTH_NAMES_MAP)) {
     if (lower.includes(name)) {
       const year = today.getFullYear();
@@ -258,22 +251,21 @@ function parseCalendarDate(text) {
     }
   }
 
-  // Brak dopasowania → domyślnie 3 tygodnie od dziś
   const end = new Date(today);
   end.setDate(end.getDate() + 21);
   return { startDate: toDateStr(today), endDate: toDateStr(end) };
 }
 
 // Zbuduj zakres dat dla kalendarza — standalone, bez zależności od workforce
-function buildCalendarDateRange(query) {
+export function buildCalendarDateRange(query: string): DateRange {
   return parseCalendarDate(query);
 }
 
 // Zbuduj kontekst z wydarzeń dla Claude
-function buildContextFromCalendar(events) {
+export function buildContextFromCalendar(events: CalendarEvent[]): string {
   if (!events || events.length === 0) return 'Brak wydarzeń w podanym zakresie.';
 
-  const byDay = {};
+  const byDay: Record<string, CalendarEvent[]> = {};
   for (const e of events) {
     const day = e.start.split('T')[0] || e.start;
     if (!byDay[day]) byDay[day] = [];
@@ -282,7 +274,7 @@ function buildContextFromCalendar(events) {
 
   const DAY_NAMES = ['niedziela', 'poniedziałek', 'wtorek', 'środa', 'czwartek', 'piątek', 'sobota'];
 
-  const lines = [];
+  const lines: string[] = [];
   for (const [day, dayEvents] of Object.entries(byDay).sort()) {
     const dayName = DAY_NAMES[new Date(day + 'T00:00:00').getDay()];
     lines.push(`  ${day} (${dayName}):`);
@@ -301,14 +293,21 @@ function buildContextFromCalendar(events) {
 }
 
 // Utwórz nowe wydarzenie w kalendarzu
-async function createCalendarEvent({ title, startDateTime, endDateTime, attendees, description }) {
+export async function createCalendarEvent({ title, startDateTime, endDateTime, attendees, description }: {
+  title: string;
+  startDateTime: string;
+  endDateTime: string;
+  attendees?: string[];
+  description?: string;
+}): Promise<string> {
   const cal = createCalendarClient();
   if (!cal) throw new Error('Google Calendar nie jest skonfigurowany.');
 
   const calendarId = CALENDAR_IDS[0];
   if (!calendarId) throw new Error('Brak skonfigurowanych kalendarzy.');
 
-  const event = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const event: any = {
     summary: title,
     description: description || '',
     start: { dateTime: startDateTime, timeZone: TIMEZONE },
@@ -319,18 +318,7 @@ async function createCalendarEvent({ title, startDateTime, endDateTime, attendee
     event.attendees = attendees.map(email => ({ email }));
   }
 
-  const res = await cal.events.insert({ calendarId, resource: event });
-  return `Utworzono wydarzenie "${res.data.summary}" (${res.data.start.dateTime} → ${res.data.end.dateTime})`;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const res = await (cal.events.insert as any)({ calendarId, resource: event });
+  return `Utworzono wydarzenie "${res.data.summary}" (${res.data.start?.dateTime} → ${res.data.end?.dateTime})`;
 }
-
-module.exports = {
-  parseServiceAccountKey,
-  createCalendarClient,
-  getEvents,
-  normalizeEvent,
-  formatEventTime,
-  parseCalendarDate,
-  buildCalendarDateRange,
-  buildContextFromCalendar,
-  createCalendarEvent,
-};

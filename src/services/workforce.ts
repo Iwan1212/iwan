@@ -1,16 +1,17 @@
-// src/services/workforce.js — integracja z Workforce Planner API
-const { logError } = require('./errors');
+// src/services/workforce.ts — integracja z Workforce Planner API
+import { logError } from './errors.js';
+import type { Employee, Assignment, DateRange } from '../types/index.js';
 
 const WP_API_URL = (process.env.WP_API_URL || '').replace(/\/$/, '');
 const WP_EMAIL = process.env.WP_EMAIL || '';
 const WP_PASSWORD = process.env.WP_PASSWORD || '';
 
 // Tokeny JWT w pamięci (restart = re-login)
-let accessToken = null;
-let refreshToken = null;
+let accessToken: string | null = null;
+let refreshToken: string | null = null;
 
 // Polskie nazwy miesięcy do parsowania dat z pytań
-const MONTH_NAMES = {
+const MONTH_NAMES: Record<string, number> = {
   'styczeń': 1, 'styczniu': 1, 'styczen': 1, 'sty': 1,
   'luty': 2, 'lutym': 2, 'lut': 2,
   'marzec': 3, 'marcu': 3, 'mar': 3,
@@ -44,16 +45,14 @@ const WP_KEYWORDS = new Set([
 ]);
 
 // Sprawdź czy pytanie dotyczy workforce (2+ keywords LUB dopasowanie frazy)
-function shouldQueryWorkforce(text) {
+export function shouldQueryWorkforce(text: string): boolean {
   if (!WP_API_URL) return false;
   const lower = text.toLowerCase();
 
-  // Dopasowanie frazy
   for (const phrase of WP_PHRASES) {
     if (lower.includes(phrase)) return true;
   }
 
-  // Dopasowanie 2+ keywords
   const words = lower.replace(/[?!.,;:()]/g, '').split(/\s+/);
   let count = 0;
   for (const w of words) {
@@ -65,7 +64,7 @@ function shouldQueryWorkforce(text) {
 }
 
 // Sprawdź czy token JWT jest wygasły (z 60s marginesem)
-function isTokenExpired(token) {
+export function isTokenExpired(token: string | null): boolean {
   if (!token) return true;
   try {
     const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
@@ -76,20 +75,20 @@ function isTokenExpired(token) {
 }
 
 // Zaloguj się do Workforce Planner API
-async function login() {
+async function login(): Promise<void> {
   const res = await fetch(`${WP_API_URL}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: WP_EMAIL, password: WP_PASSWORD }),
   });
   if (!res.ok) throw new Error(`Login failed: ${res.status}`);
-  const data = await res.json();
+  const data = await res.json() as Record<string, string>;
   accessToken = data.access_token || data.accessToken;
   refreshToken = data.refresh_token || data.refreshToken;
 }
 
 // Odśwież token JWT
-async function refreshAuth() {
+async function refreshAuth(): Promise<void> {
   const res = await fetch(`${WP_API_URL}/api/auth/refresh`, {
     method: 'POST',
     headers: {
@@ -98,7 +97,7 @@ async function refreshAuth() {
     },
   });
   if (!res.ok) throw new Error(`Refresh failed: ${res.status}`);
-  const data = await res.json();
+  const data = await res.json() as Record<string, string>;
   accessToken = data.access_token || data.accessToken;
   if (data.refresh_token || data.refreshToken) {
     refreshToken = data.refresh_token || data.refreshToken;
@@ -106,7 +105,7 @@ async function refreshAuth() {
 }
 
 // Upewnij się że mamy ważny token
-async function ensureAuth() {
+export async function ensureAuth(): Promise<void> {
   if (!isTokenExpired(accessToken)) return;
   if (refreshToken && !isTokenExpired(refreshToken)) {
     try { await refreshAuth(); return; } catch (_) {}
@@ -115,11 +114,11 @@ async function ensureAuth() {
 }
 
 // Wrapper na fetch z Bearer token
-async function wpFetch(path, params = {}) {
+export async function wpFetch(path: string, params: Record<string, string | number | undefined | null> = {}): Promise<unknown> {
   await ensureAuth();
   const url = new URL(`${WP_API_URL}${path}`);
   for (const [k, v] of Object.entries(params)) {
-    if (v !== undefined && v !== null) url.searchParams.set(k, v);
+    if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
   }
   const res = await fetch(url.toString(), {
     headers: { 'Authorization': `Bearer ${accessToken}` },
@@ -129,7 +128,7 @@ async function wpFetch(path, params = {}) {
 }
 
 // Pobierz timeline alokacji
-async function getTimeline(startDate, endDate, options = {}) {
+export async function getTimeline(startDate: string, endDate: string, options: Record<string, string | number> = {}): Promise<unknown> {
   return wpFetch('/api/assignments/timeline', {
     start_date: startDate,
     end_date: endDate,
@@ -138,20 +137,19 @@ async function getTimeline(startDate, endDate, options = {}) {
 }
 
 // Pobierz listę pracowników
-async function getEmployees(options = {}) {
+export async function getEmployees(options: Record<string, string | number> = {}): Promise<unknown> {
   return wpFetch('/api/employees', options);
 }
 
 // Pobierz listę projektów
-async function getProjects() {
+export async function getProjects(): Promise<unknown> {
   return wpFetch('/api/projects');
 }
 
 // Parsuj miesiąc z tekstu ("w marcu" → 3, "Q1" → [1,2,3])
-function parseMonthFromText(text) {
+export function parseMonthFromText(text: string): { startMonth: number; endMonth: number } {
   const lower = text.toLowerCase();
 
-  // Kwartały
   const qMatch = lower.match(/q(\d)/);
   if (qMatch) {
     const q = parseInt(qMatch[1]);
@@ -159,20 +157,18 @@ function parseMonthFromText(text) {
     return { startMonth: start, endMonth: start + 2 };
   }
 
-  // Polskie nazwy miesięcy
   for (const [name, num] of Object.entries(MONTH_NAMES)) {
     if (lower.includes(name)) {
       return { startMonth: num, endMonth: num };
     }
   }
 
-  // Domyślnie: bieżący + 2 miesiące
   const now = new Date();
   return { startMonth: now.getMonth() + 1, endMonth: now.getMonth() + 3 };
 }
 
 // Zbuduj daty z parsowanych miesięcy
-function buildDateRange(text) {
+export function buildDateRange(text: string): DateRange {
   const { startMonth, endMonth } = parseMonthFromText(text);
   const year = new Date().getFullYear();
   const adjustedEndMonth = endMonth > 12 ? endMonth - 12 : endMonth;
@@ -184,7 +180,7 @@ function buildDateRange(text) {
 }
 
 // Wyszukaj dane z Workforce Planner
-async function searchWorkforce(query) {
+export async function searchWorkforce(query: string): Promise<unknown> {
   if (!shouldQueryWorkforce(query)) return null;
   if (!WP_API_URL) return null;
 
@@ -195,40 +191,40 @@ async function searchWorkforce(query) {
     console.log(`[workforce] Pobrano dane timeline`);
     return data;
   } catch (error) {
-    logError('workforce', 'Błąd pobierania danych z Workforce', error.message);
+    logError('workforce', 'Błąd pobierania danych z Workforce', (error as Error).message);
     return null;
   }
 }
 
 // Wyciągnij procent z wartości utilization (może być liczbą lub obiektem {percentage})
-function getUtilPercent(val) {
+export function getUtilPercent(val: number | { percentage: number } | unknown): number {
   if (typeof val === 'number') return val;
-  if (val && typeof val === 'object') return val.percentage || 0;
+  if (val && typeof val === 'object') return (val as { percentage: number }).percentage || 0;
   return 0;
 }
 
 // Wyciągnij procent alokacji z przypisania
-function getAllocPercent(assignment) {
+export function getAllocPercent(assignment: Assignment): number {
   return assignment.allocation_value || assignment.allocation || assignment.percentage || 0;
 }
 
 // Zbuduj kontekst z danych Workforce dla Claude (max 4000 znaków)
-function buildContextFromWorkforce(data) {
+export function buildContextFromWorkforce(data: unknown): string {
   if (!data) return '';
 
   try {
-    const lines = [];
+    const lines: string[] = [];
     let overbookCount = 0;
     let freeCount = 0;
     let totalUtil = 0;
     let empCount = 0;
 
-    // Dane mogą być tablicą pracowników lub obiekt z employees
-    const employees = Array.isArray(data) ? data : (data.employees || data.data || []);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const raw = data as any;
+    const employees: Employee[] = Array.isArray(raw) ? raw : (raw.employees || raw.data || []);
     if (employees.length === 0) return '';
 
-    // Grupuj po teamie
-    const teams = {};
+    const teams: Record<string, Employee[]> = {};
     for (const emp of employees) {
       const team = emp.team || emp.department || 'Inny';
       if (!teams[team]) teams[team] = [];
@@ -242,7 +238,6 @@ function buildContextFromWorkforce(data) {
         const assignments = emp.assignments || [];
         const utilization = emp.utilization || {};
 
-        // Średnia utylizacja per osoba
         const utilVals = Object.values(utilization).map(getUtilPercent);
         const avgEmpUtil = utilVals.length > 0
           ? Math.round(utilVals.reduce((a, b) => a + b, 0) / utilVals.length)
@@ -279,23 +274,7 @@ function buildContextFromWorkforce(data) {
 
     return `\n\nKONTEKST Z WORKFORCE PLANNER:\n---\n${truncated}\n---\n`;
   } catch (error) {
-    logError('workforce', 'Błąd budowania kontekstu workforce', error.message);
+    logError('workforce', 'Błąd budowania kontekstu workforce', (error as Error).message);
     return '';
   }
 }
-
-module.exports = {
-  shouldQueryWorkforce,
-  isTokenExpired,
-  searchWorkforce,
-  buildContextFromWorkforce,
-  getTimeline,
-  getEmployees,
-  getProjects,
-  parseMonthFromText,
-  buildDateRange,
-  wpFetch,
-  ensureAuth,
-  getUtilPercent,
-  getAllocPercent,
-};

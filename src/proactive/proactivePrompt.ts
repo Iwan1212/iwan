@@ -1,14 +1,15 @@
-// src/proactive/proactivePrompt.js — system prompt dla trybu proaktywnego
-const { buildCachedToolSystemPrompt } = require('../services/promptCache');
+// src/proactive/proactivePrompt.ts — system prompt dla trybu proaktywnego
+import { buildCachedToolSystemPrompt } from '../services/promptCache.js';
+import type { CacheBlock } from '../services/promptCache.js';
 
 // Zbuduj system prompt dla proaktywnej odpowiedzi (array bloków z cache_control)
-function buildProactiveSystemPrompt(companyContext) {
+export function buildProactiveSystemPrompt(companyContext: string): CacheBlock[] {
   const baseBlocks = buildCachedToolSystemPrompt('Iwan (proaktywny)', companyContext);
 
   return [
     ...baseBlocks,
     {
-      type: 'text',
+      type: 'text' as const,
       text: `\nTRYB PROAKTYWNY — DODATKOWE ZASADY:
 - Wtrącasz się do rozmowy z własnej inicjatywy, NIE na @mention
 - Bądź KRÓTKI: max 2-3 zdania. Nie pisz elaboratów
@@ -20,5 +21,3 @@ function buildProactiveSystemPrompt(companyContext) {
     },
   ];
 }
-
-module.exports = { buildProactiveSystemPrompt };

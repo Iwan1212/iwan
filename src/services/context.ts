@@ -1,12 +1,12 @@
-// src/services/context.js — pobieranie kontekstu firmowego z Supabase
-const { supabase } = require('./supabase');
-const { logError } = require('./errors');
+// src/services/context.ts — pobieranie kontekstu firmowego z Supabase
+import { supabase } from './supabase.js';
+import { logError } from './errors.js';
 
-const contextCache = new Map();
+const contextCache = new Map<string, { value: Record<string, string>; timestamp: number }>();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minut
 
 // Mapa tematów → słowa kluczowe wyzwalające dany temat
-const TOPIC_KEYWORDS = {
+const TOPIC_KEYWORDS: Record<string, Set<string>> = {
   'struktura-organizacyjna': new Set([
     'kto', 'zespół', 'zespol', 'zespole', 'zespołu', 'team',
     'szef', 'szefa', 'lider', 'lidera', 'leader',
@@ -34,9 +34,9 @@ const TOPIC_KEYWORDS = {
 };
 
 // Dopasuj tematy do zapytania użytkownika (zwraca listę pasujących tematów)
-function matchTopics(query) {
+export function matchTopics(query: string): string[] {
   const words = query.toLowerCase().replace(/[?!.,;:()]/g, '').split(/\s+/);
-  const matched = [];
+  const matched: string[] = [];
 
   for (const [topic, keywords] of Object.entries(TOPIC_KEYWORDS)) {
     if (words.some(w => keywords.has(w))) {
@@ -44,12 +44,11 @@ function matchTopics(query) {
     }
   }
 
-  // Fallback: pytania o ludzi najczęstsze
   return matched.length > 0 ? matched : ['struktura-organizacyjna'];
 }
 
 // Pobierz wszystkie tematy z Supabase (z cache 5 min)
-async function getAllTopics() {
+async function getAllTopics(): Promise<Record<string, string>> {
   const cacheKey = 'all_topics';
   const cached = contextCache.get(cacheKey);
 
@@ -68,7 +67,7 @@ async function getAllTopics() {
       return {};
     }
 
-    const topics = {};
+    const topics: Record<string, string> = {};
     for (const row of data) {
       topics[row.topic] = row.content;
     }
@@ -76,19 +75,18 @@ async function getAllTopics() {
     contextCache.set(cacheKey, { value: topics, timestamp: Date.now() });
     return topics;
   } catch (err) {
-    logError('context', 'Błąd pobierania kontekstu firmowego', err.message);
+    logError('context', 'Błąd pobierania kontekstu firmowego', (err as Error).message);
     return {};
   }
 }
 
 // Pobierz kontekst firmowy — selektywnie wg zapytania lub wszystko (backward compatible)
-async function getCompanyContext(query = '') {
+export async function getCompanyContext(query = ''): Promise<string> {
   const allTopics = await getAllTopics();
   if (Object.keys(allTopics).length === 0) return '';
 
-  let selectedTopics;
+  let selectedTopics: string[];
   if (!query) {
-    // Bez query → zwróć wszystko (backward compatible)
     selectedTopics = Object.keys(allTopics);
   } else {
     selectedTopics = matchTopics(query);
@@ -105,5 +103,3 @@ async function getCompanyContext(query = '') {
 
   return '\n\nINFORMACJE O FIRMIE:\n' + entries.join('\n');
 }
-
-module.exports = { getCompanyContext, matchTopics };

@@ -1,12 +1,13 @@
-// src/services/calamari.js — integracja z Calamari API (urlopy i nieobecności)
+// src/services/calamari.ts — integracja z Calamari API (urlopy i nieobecności)
 
-const { logError } = require('./errors');
+import { logError } from './errors.js';
+import type { Absence, DateRange } from '../types/index.js';
 
 const CALAMARI_URL = (process.env.CALAMARI_URL || '').replace(/\/$/, '');
 const CALAMARI_API_KEY = process.env.CALAMARI_API_KEY || '';
 
 // Bazowy fetch do Calamari API (POST + Basic Auth)
-async function calamariFetch(path, body = {}) {
+export async function calamariFetch(path: string, body: Record<string, unknown> = {}): Promise<unknown> {
   const auth = Buffer.from(`calamari:${CALAMARI_API_KEY}`).toString('base64');
   const res = await fetch(`${CALAMARI_URL}${path}`, {
     method: 'POST',
@@ -21,23 +22,23 @@ async function calamariFetch(path, body = {}) {
 }
 
 // Pobierz nieobecności w danym zakresie dat (zaakceptowane + oczekujące)
-async function getAbsences(from, to) {
-  const data = await calamariFetch('/api/leave/request/v1/find-advanced', { from, to });
+export async function getAbsences(from: string, to: string): Promise<Absence[]> {
+  const data = await calamariFetch('/api/leave/request/v1/find-advanced', { from, to }) as Absence[];
   return (data || []).filter(r => r.status === 'ACCEPTED' || r.status === 'PENDING');
 }
 
 // Parsuj zakres dat z zapytania (reużywa logikę z workforce)
-function buildCalamariDateRange(query) {
+export function buildCalamariDateRange(query: string): DateRange {
   const { buildDateRange } = require('./workforce');
   return buildDateRange(query);
 }
 
 // Zbuduj kontekst z nieobecności dla Claude
-function buildContextFromCalamari(absences) {
+export function buildContextFromCalamari(absences: Absence[]): string {
   if (!absences || absences.length === 0) return '';
 
-  const lines = [];
-  const byPerson = {};
+  const lines: string[] = [];
+  const byPerson: Record<string, { type: string; from: string; to: string; days: number; status: string }[]> = {};
 
   for (const a of absences) {
     const email = a.employeeEmail || '?';
@@ -63,5 +64,3 @@ function buildContextFromCalamari(absences) {
   const content = lines.join('\n').substring(0, 3000);
   return `\n\nKONTEKST Z CALAMARI (urlopy i nieobecności):\nUWAGA: Jeśli danej osoby NIE MA na liście — znaczy że nie ma żadnej zarejestrowanej nieobecności. Nie zgaduj i nie mieszaj danych między osobami.\n---\n${content}\n---\n`;
 }
-
-module.exports = { calamariFetch, getAbsences, buildCalamariDateRange, buildContextFromCalamari };

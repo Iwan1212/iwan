@@ -1,11 +1,16 @@
-// src/proactive/threadTracker.js — licznik wiadomości w wątkach (in-memory)
-const { getProactiveConfig } = require('./config');
+// src/proactive/threadTracker.ts — licznik wiadomości w wątkach (in-memory)
+import { getProactiveConfig } from './config.js';
+
+interface ThreadEntry {
+  count: number;
+  respondedAt: number | null;
+}
 
 // Map: "channelId:threadTs" → { count, respondedAt }
-const threads = new Map();
+const threads = new Map<string, ThreadEntry>();
 
 // Śledź wiadomość w wątku, zwraca { triggered } gdy osiągnięto threshold
-function trackThreadMessage(channelId, threadTs) {
+export function trackThreadMessage(channelId: string, threadTs: string): { triggered: boolean } {
   if (!threadTs) return { triggered: false };
 
   const key = `${channelId}:${threadTs}`;
@@ -27,19 +32,19 @@ function trackThreadMessage(channelId, threadTs) {
 }
 
 // Oznacz wątek jako obsłużony — ustaw cooldown i resetuj licznik
-function markThreadResponded(channelId, threadTs) {
+export function markThreadResponded(channelId: string, threadTs: string): void {
   const key = `${channelId}:${threadTs}`;
-  const entry = threads.get(key) || { count: 0 };
+  const entry = threads.get(key) || { count: 0, respondedAt: null };
   entry.count = 0;
   entry.respondedAt = Date.now();
   threads.set(key, entry);
 }
 
 // Wyczyść wpisy starsze niż 24h
-function cleanupThreads() {
+export function cleanupThreads(): void {
   const maxAge = 24 * 60 * 60 * 1000;
   const now = Date.now();
-  for (const [key, entry] of threads) {
+  for (const [key, _entry] of threads) {
     const ts = parseFloat(key.split(':')[1]) * 1000;
     if (now - ts > maxAge) {
       threads.delete(key);
@@ -48,8 +53,6 @@ function cleanupThreads() {
 }
 
 // Eksportuj map do testów
-function _getThreads() {
+export function _getThreads(): Map<string, ThreadEntry> {
   return threads;
 }
-
-module.exports = { trackThreadMessage, markThreadResponded, cleanupThreads, _getThreads };

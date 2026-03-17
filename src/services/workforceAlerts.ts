@@ -1,30 +1,33 @@
-// src/services/workforceAlerts.js — proaktywne alerty overbookingu + weekly summary
-const { getTimeline, getUtilPercent, getAllocPercent } = require('./workforce');
-const { askClaude } = require('./claude');
-const { toSlackMarkdown } = require('./format');
-const { logError } = require('./errors');
+// src/services/workforceAlerts.ts — proaktywne alerty overbookingu + weekly summary
+import { getTimeline, getUtilPercent, getAllocPercent } from './workforce.js';
+import { askClaude } from './claude.js';
+import { toSlackMarkdown } from './format.js';
+import { logError } from './errors.js';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SlackApp = any;
 
 const ALERT_CHANNEL = process.env.WP_ALERT_CHANNEL || '';
-const ALERT_INTERVAL = (parseInt(process.env.WP_ALERT_INTERVAL_HOURS, 10) || 24) * 3600 * 1000;
-const LOW_UTIL_THRESHOLD = parseInt(process.env.WP_LOW_UTIL_THRESHOLD, 10) || 20;
+const ALERT_INTERVAL = (parseInt(process.env.WP_ALERT_INTERVAL_HOURS || '', 10) || 24) * 3600 * 1000;
+const LOW_UTIL_THRESHOLD = parseInt(process.env.WP_LOW_UTIL_THRESHOLD || '', 10) || 20;
 const SUMMARY_CHANNEL = process.env.WP_SUMMARY_CHANNEL || '';
-const SUMMARY_HOUR = parseInt(process.env.WP_SUMMARY_HOUR, 10) || 8;
+const SUMMARY_HOUR = parseInt(process.env.WP_SUMMARY_HOUR || '', 10) || 8;
 
 // Deduplikacja alertów (klucz: empId-month-type)
-const sentAlerts = new Set();
+const sentAlerts = new Set<string>();
 
 // Wyczyść stare alerty raz na dobę
-function clearOldAlerts() {
+function clearOldAlerts(): void {
   sentAlerts.clear();
 }
 
 // Formatuj datę jako YYYY-MM-DD
-function formatDate(date) {
+export function formatDate(date: Date): string {
   return date.toISOString().split('T')[0];
 }
 
 // Sprawdź alerty overbookingu i niskiej utylizacji
-async function checkAlerts(app) {
+export async function checkAlerts(app: SlackApp): Promise<void> {
   if (!ALERT_CHANNEL) return;
 
   try {
@@ -33,10 +36,12 @@ async function checkAlerts(app) {
     endDate.setDate(endDate.getDate() + 30);
 
     const data = await getTimeline(formatDate(now), formatDate(endDate));
-    const employees = Array.isArray(data) ? data : (data.employees || data.data || []);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const employees: any[] = Array.isArray(data) ? data : ((data as any).employees || (data as any).data || []);
 
-    const alerts = [];
+    const alerts: string[] = [];
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const emp of employees) {
       const name = emp.name || `${emp.first_name || ''} ${emp.last_name || ''}`.trim();
       const empId = emp.id || emp.employee_id || name;
@@ -72,12 +77,12 @@ async function checkAlerts(app) {
       console.log(`[workforce-alerts] Wysłano ${alerts.length} alertów`);
     }
   } catch (error) {
-    logError('workforce-alerts', 'Błąd sprawdzania alertów', error.message);
+    logError('workforce-alerts', 'Błąd sprawdzania alertów', (error as Error).message);
   }
 }
 
 // Włącz cykliczne sprawdzanie alertów
-function setupWorkforceAlerts(app) {
+export function setupWorkforceAlerts(app: SlackApp): void {
   if (!ALERT_CHANNEL || !process.env.WP_API_URL) {
     console.log('[workforce-alerts] Brak konfiguracji — alerty wyłączone');
     return;
@@ -96,7 +101,7 @@ function setupWorkforceAlerts(app) {
 }
 
 // Generuj cotygodniowe podsumowanie alokacji
-async function generateWeeklySummary(app) {
+export async function generateWeeklySummary(app: SlackApp): Promise<void> {
   if (!SUMMARY_CHANNEL) return;
 
   try {
@@ -105,7 +110,8 @@ async function generateWeeklySummary(app) {
     endDate.setMonth(endDate.getMonth() + 2);
 
     const data = await getTimeline(formatDate(now), formatDate(endDate));
-    const employees = Array.isArray(data) ? data : (data.employees || data.data || []);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const employees: any[] = Array.isArray(data) ? data : ((data as any).employees || (data as any).data || []);
 
     if (employees.length === 0) {
       console.log('[workforce-summary] Brak danych — pomijam');
@@ -126,7 +132,7 @@ async function generateWeeklySummary(app) {
 Dane:
 ${rawData}`;
 
-    const summary = await askClaude(prompt);
+    const summary = await askClaude(prompt, 'Iwan');
     const formatted = toSlackMarkdown(summary);
 
     await app.client.chat.postMessage({
@@ -136,15 +142,18 @@ ${rawData}`;
 
     console.log('[workforce-summary] Wysłano weekly summary');
   } catch (error) {
-    logError('workforce-summary', 'Błąd generowania weekly summary', error.message);
+    logError('workforce-summary', 'Błąd generowania weekly summary', (error as Error).message);
   }
 }
 
 // Zbuduj surowe dane dla Claude
-function buildRawSummaryData(employees, now) {
-  const lines = [];
-  const teams = {};
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function buildRawSummaryData(employees: any[], now: Date): string {
+  const lines: string[] = [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const teams: Record<string, any[]> = {};
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   for (const emp of employees) {
     const name = emp.name || `${emp.first_name || ''} ${emp.last_name || ''}`.trim();
     const team = emp.team || emp.department || 'Inny';
@@ -160,7 +169,8 @@ function buildRawSummaryData(employees, now) {
     lines.push(`Team: ${teamName}`);
     for (const m of members) {
       const assignStr = m.assignments.length > 0
-        ? m.assignments.map(a => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ? m.assignments.map((a: any) => {
             const proj = a.project_name || a.project || '?';
             const alloc = getAllocPercent(a);
             const start = a.start_date || '';
@@ -178,12 +188,12 @@ function buildRawSummaryData(employees, now) {
 }
 
 // Sprawdź czy to poniedziałek o odpowiedniej godzinie
-function isWeeklySummaryTime(now) {
+export function isWeeklySummaryTime(now: Date): boolean {
   return now.getDay() === 1 && now.getHours() === SUMMARY_HOUR;
 }
 
 // Włącz cotygodniowe podsumowanie (sprawdza co godzinę)
-function setupWeeklySummary(app) {
+export function setupWeeklySummary(app: SlackApp): void {
   if (!SUMMARY_CHANNEL || !process.env.WP_API_URL) {
     console.log('[workforce-summary] Brak konfiguracji — summary wyłączone');
     return;
@@ -197,13 +207,3 @@ function setupWeeklySummary(app) {
 
   console.log(`[workforce-summary] Weekly summary włączone (poniedziałek ${SUMMARY_HOUR}:00)`);
 }
-
-module.exports = {
-  setupWorkforceAlerts,
-  setupWeeklySummary,
-  checkAlerts,
-  generateWeeklySummary,
-  isWeeklySummaryTime,
-  buildRawSummaryData,
-  formatDate,
-};

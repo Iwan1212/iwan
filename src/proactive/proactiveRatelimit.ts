@@ -1,11 +1,11 @@
-// src/proactive/proactiveRatelimit.js — globalny rate limit proaktywnych odpowiedzi
-const { getProactiveConfig } = require('./config');
+// src/proactive/proactiveRatelimit.ts — globalny rate limit proaktywnych odpowiedzi
+import { getProactiveConfig } from './config.js';
 
 // Lista timestampów odpowiedzi proaktywnych
-const timestamps = [];
+const timestamps: number[] = [];
 
 // Sprawdź czy limit globalny nie został przekroczony
-function checkProactiveRateLimit() {
+export function checkProactiveRateLimit(): { allowed: boolean; count: number } {
   const config = getProactiveConfig();
   const oneHourAgo = Date.now() - 60 * 60 * 1000;
 
@@ -21,13 +21,11 @@ function checkProactiveRateLimit() {
 }
 
 // Zapisz timestamp odpowiedzi proaktywnej
-function recordProactiveResponse() {
+export function recordProactiveResponse(): void {
   timestamps.push(Date.now());
 }
 
 // Eksportuj do testów
-function _getTimestamps() {
+export function _getTimestamps(): number[] {
   return timestamps;
 }
-
-module.exports = { checkProactiveRateLimit, recordProactiveResponse, _getTimestamps };

@@ -1,14 +1,22 @@
-// src/handlers/approvalFlow.js — approval flow przy dołączaniu do kanału
-const { backfillChannel } = require('../crawler/backfill');
-const { logError } = require('../services/errors');
+// src/handlers/approvalFlow.ts — approval flow przy dołączaniu do kanału
+import { backfillChannel } from '../crawler/backfill.js';
+import { logError } from '../services/errors.js';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SlackApp = any;
+
+interface PendingApproval {
+  channelId: string;
+  inviterId: string | undefined;
+}
 
 // Pending approvals — in-memory store (Map<channelId, { channelId, inviterId }>)
-const pendingApprovals = new Map();
+export const pendingApprovals = new Map<string, PendingApproval>();
 
 const ADMIN_USER_ID = process.env.SLACK_ADMIN_USER_ID;
 
 // Wyślij DM do admina z przyciskami zatwierdzenia
-async function sendApprovalRequest(app, channelId, inviterId) {
+export async function sendApprovalRequest(app: SlackApp, channelId: string, inviterId?: string): Promise<void> {
   const channelInfo = await app.client.conversations.info({ channel: channelId });
   const channelName = channelInfo.channel.name;
 
@@ -51,8 +59,9 @@ async function sendApprovalRequest(app, channelId, inviterId) {
 }
 
 // Zarejestruj action handlery dla approve/reject
-function setupApprovalActions(app) {
-  app.action('approve_channel', async ({ action, body, client }) => {
+export function setupApprovalActions(app: SlackApp): void {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  app.action('approve_channel', async ({ action, body, client }: any) => {
     const channelId = action.value;
 
     // Wyślij wiadomość powitalną do kanału
@@ -62,7 +71,7 @@ function setupApprovalActions(app) {
     });
 
     // Backfill — fire-and-forget
-    backfillChannel(app, channelId).catch(err => {
+    backfillChannel(app, channelId).catch((err: Error) => {
       logError('approvalFlow', 'Błąd backfillu po zatwierdzeniu', err.message);
     });
 
@@ -85,7 +94,8 @@ function setupApprovalActions(app) {
     pendingApprovals.delete(channelId);
   });
 
-  app.action('reject_channel', async ({ action, body, client }) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  app.action('reject_channel', async ({ action, body, client }: any) => {
     const channelId = action.value;
 
     // Opuść kanał
@@ -112,5 +122,3 @@ function setupApprovalActions(app) {
 
   console.log('✅ Approval flow aktywny');
 }
-
-module.exports = { sendApprovalRequest, setupApprovalActions, pendingApprovals };

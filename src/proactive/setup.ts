@@ -1,10 +1,13 @@
-// src/proactive/setup.js — inicjalizacja trybu proaktywnego
-const { isProactiveEnabled } = require('./config');
-const { resolveProactiveChannels } = require('./channelResolver');
-const { cleanupThreads } = require('./threadTracker');
+// src/proactive/setup.ts — inicjalizacja trybu proaktywnego
+import { isProactiveEnabled } from './config.js';
+import { resolveProactiveChannels } from './channelResolver.js';
+import { cleanupThreads } from './threadTracker.js';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SlackApp = any;
 
 // Inicjalizuj tryb proaktywny przy starcie
-async function setupProactive(app) {
+export async function setupProactive(app: SlackApp): Promise<void> {
   if (!isProactiveEnabled()) {
     console.log('[proactive] Tryb proaktywny wyłączony (ENABLE_PROACTIVE !== true)');
     return;
@@ -18,5 +21,3 @@ async function setupProactive(app) {
 
   console.log('[proactive] Tryb proaktywny aktywny');
 }
-
-module.exports = { setupProactive };

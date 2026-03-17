@@ -1,6 +1,6 @@
-// src/proactive/topicDetector.js — wykrywanie tematów (keyword match, zero AI)
+// src/proactive/topicDetector.ts — wykrywanie tematów (keyword match, zero AI)
 
-const TOPIC_KEYWORDS = {
+export const TOPIC_KEYWORDS: Record<string, Set<string>> = {
   dostepnosc: new Set([
     'dostępny', 'dostępna', 'dostępni', 'dostepny', 'dostepna', 'dostepni',
     'dostępność', 'dostepnosc', 'availability', 'available',
@@ -37,10 +37,10 @@ const TOPIC_KEYWORDS = {
 };
 
 // Wykryj tematy na podstawie keywords w tekście
-function detectTopics(text) {
+export function detectTopics(text: string): string[] {
   if (!text) return [];
   const lower = text.toLowerCase();
-  const matched = [];
+  const matched: string[] = [];
 
   for (const [topic, keywords] of Object.entries(TOPIC_KEYWORDS)) {
     for (const keyword of keywords) {
@@ -53,5 +53,3 @@ function detectTopics(text) {
 
   return matched;
 }
-
-module.exports = { detectTopics, TOPIC_KEYWORDS };

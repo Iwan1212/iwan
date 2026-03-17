@@ -1,12 +1,16 @@
-// src/crawler/listener.js
-const { saveSlackMessage } = require('./saveMessage');
-const { getUserName } = require('../services/users');
-const { getChannelName } = require('../services/channels');
-const { isProactiveEnabled } = require('../proactive/config');
+// src/crawler/listener.ts
+import { saveSlackMessage } from './saveMessage.js';
+import { getUserName } from '../services/users.js';
+import { getChannelName } from '../services/channels.js';
+import { isProactiveEnabled } from '../proactive/config.js';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SlackApp = any;
 
 // Nasłuchuj WSZYSTKICH wiadomości w kanałach (nie tylko wzmianki)
-function setupCrawler(app) {
-  app.message(async ({ message }) => {
+export function setupCrawler(app: SlackApp): void {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  app.message(async ({ message }: any) => {
     // Ignoruj subtypy (edycje, usunięcia etc.)
     if (message.subtype) return;
     // Ignoruj boty
@@ -18,11 +22,9 @@ function setupCrawler(app) {
 
     // Hook proaktywny — fire-and-forget
     if (isProactiveEnabled()) {
-      const { evaluateMessage } = require('../proactive/engine');
+      const { evaluateMessage } = await import('../proactive/engine.js');
       evaluateMessage(app, message, channelName).catch(() => {});
     }
   });
   console.log('📡 Crawler Slack aktywny — zapisuję wiadomości z kanałów');
 }
-
-module.exports = { setupCrawler };

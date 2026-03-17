@@ -1,20 +1,25 @@
-// src/crawler/backfill.js — backfill historii kanału z paginacją
-const { saveSlackMessage } = require('./saveMessage');
-const { getUserName } = require('../services/users');
-const { getChannelName } = require('../services/channels');
-const { logError } = require('../services/errors');
+// src/crawler/backfill.ts — backfill historii kanału z paginacją
+import { saveSlackMessage } from './saveMessage.js';
+import { getUserName } from '../services/users.js';
+import { getChannelName } from '../services/channels.js';
+import { logError } from '../services/errors.js';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SlackApp = any;
 
 const PAGE_SIZE = 200;
 const DELAY_MS = 1200;
 
 // Czekaj określony czas (rate limit safety)
-function delay(ms) {
+function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 // Pobierz jedną stronę historii kanału
-async function fetchPage(app, channelId, cursor) {
-  const params = { channel: channelId, limit: PAGE_SIZE };
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function fetchPage(app: SlackApp, channelId: string, cursor: string | null): Promise<{ messages: any[]; nextCursor: string | null }> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params: any = { channel: channelId, limit: PAGE_SIZE };
   if (cursor) params.cursor = cursor;
 
   const result = await app.client.conversations.history(params);
@@ -25,22 +30,25 @@ async function fetchPage(app, channelId, cursor) {
 }
 
 // Pobierz CAŁĄ historię kanału z paginacją i retry
-async function backfillChannel(app, channelId) {
+export async function backfillChannel(app: SlackApp, channelId: string): Promise<number> {
   const channelName = await getChannelName(app, channelId);
-  let cursor = null;
+  let cursor: string | null = null;
   let totalSaved = 0;
   let page = 0;
 
   // Zbierz wszystkie wiadomości ze wszystkich stron
-  const allMessages = [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const allMessages: any[] = [];
   do {
     page++;
     let data;
     try {
       data = await fetchPage(app, channelId, cursor);
     } catch (err) {
-      if (err.data?.error === 'ratelimited' || err.code === 429) {
-        const retryAfter = (err.headers?.['retry-after'] ?? 10) * 1000;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const slackErr = err as any;
+      if (slackErr.data?.error === 'ratelimited' || slackErr.code === 429) {
+        const retryAfter = (slackErr.headers?.['retry-after'] ?? 10) * 1000;
         console.log(`⏳ Rate limit — czekam ${retryAfter / 1000}s...`);
         await delay(retryAfter);
         data = await fetchPage(app, channelId, cursor);
@@ -57,13 +65,15 @@ async function backfillChannel(app, channelId) {
   } while (cursor);
 
   // Batch user name resolution — zbierz unikalne IDs, resolwuj raz
-  const userIds = [...new Set(allMessages.filter(m => m.user).map(m => m.user))];
-  const userNames = {};
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const userIds = [...new Set(allMessages.filter((m: any) => m.user).map((m: any) => m.user as string))];
+  const userNames: Record<string, string> = {};
   for (const userId of userIds) {
     userNames[userId] = await getUserName(app, userId);
   }
 
   // Zapisz wiadomości przez saveSlackMessage (upsert)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   for (const msg of allMessages) {
     if (msg.bot_id || !msg.text) continue;
     await saveSlackMessage({
@@ -83,9 +93,10 @@ async function backfillChannel(app, channelId) {
 }
 
 // Backfilluj wszystkie kanały, w których bot jest członkiem
-async function backfillAllChannels(app) {
+export async function backfillAllChannels(app: SlackApp): Promise<number> {
   const result = await app.client.conversations.list({ types: 'public_channel' });
-  const channels = (result.channels || []).filter(ch => ch.is_member);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const channels = (result.channels || []).filter((ch: any) => ch.is_member);
   let total = 0;
 
   for (const ch of channels) {
@@ -96,5 +107,3 @@ async function backfillAllChannels(app) {
   console.log(`🏁 Backfill wszystkich kanałów zakończony — ${total} wiadomości`);
   return total;
 }
-
-module.exports = { backfillChannel, backfillAllChannels };

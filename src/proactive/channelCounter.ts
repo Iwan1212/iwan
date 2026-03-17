@@ -1,11 +1,16 @@
-// src/proactive/channelCounter.js — licznik wiadomości na kanale (in-memory)
-const { getProactiveConfig } = require('./config');
+// src/proactive/channelCounter.ts — licznik wiadomości na kanale (in-memory)
+import { getProactiveConfig } from './config.js';
+
+interface ChannelEntry {
+  count: number;
+  respondedAt: number | null;
+}
 
 // Map: channelId → { count, respondedAt }
-const channels = new Map();
+const channels = new Map<string, ChannelEntry>();
 
 // Śledź wiadomość na kanale, zwraca { triggered } co N wiadomości
-function trackChannelMessage(channelId) {
+export function trackChannelMessage(channelId: string): { triggered: boolean } {
   const entry = channels.get(channelId) || { count: 0, respondedAt: null };
   entry.count++;
   channels.set(channelId, entry);
@@ -24,16 +29,14 @@ function trackChannelMessage(channelId) {
 }
 
 // Oznacz kanał jako obsłużony — reset + cooldown
-function markChannelResponded(channelId) {
-  const entry = channels.get(channelId) || {};
+export function markChannelResponded(channelId: string): void {
+  const entry = channels.get(channelId) || { count: 0, respondedAt: null };
   entry.count = 0;
   entry.respondedAt = Date.now();
   channels.set(channelId, entry);
 }
 
 // Eksportuj map do testów
-function _getChannels() {
+export function _getChannels(): Map<string, ChannelEntry> {
   return channels;
 }
-
-module.exports = { trackChannelMessage, markChannelResponded, _getChannels };

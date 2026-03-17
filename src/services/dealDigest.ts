@@ -1,22 +1,39 @@
-// src/services/dealDigest.js — automatyczny daily digest: Slack → Pipedrive notes
-const Anthropic = require('@anthropic-ai/sdk');
-const { MODEL_SONNET } = require('./models');
-const { supabase } = require('./supabase');
-const { getDealNotes, findAgentNote, createNote, updateNote, createActivity } = require('./pipedrive');
-const { resolveChannelToDeal, resolveThreadToDeal } = require('./dealResolver');
-const { loadAllKnowledge, loadKnowledgeFile } = require('./knowledge');
-const { logError } = require('./errors');
-const { SALES_PREFIX, MONITORED_CHANNELS, MIN_MESSAGES, NOTE_PREFIX, LANGUAGE } = require('./dealConfig');
-const { cleanLlmJson, groupByThread } = require('./dealUtils');
-const crypto = require('crypto');
+// src/services/dealDigest.ts — automatyczny daily digest: Slack → Pipedrive notes
+import { anthropic } from './anthropicClient.js';
+import { MODEL_SONNET } from './models.js';
+import { supabase } from './supabase.js';
+import { getDealNotes, findAgentNote, createNote, updateNote, createActivity } from './pipedrive.js';
+import { resolveChannelToDeal, resolveThreadToDeal } from './dealResolver.js';
+import { loadAllKnowledge, loadKnowledgeFile } from './knowledge.js';
+import { logError } from './errors.js';
+import { SALES_PREFIX, MONITORED_CHANNELS, MIN_MESSAGES, NOTE_PREFIX, LANGUAGE } from './dealConfig.js';
+import { cleanLlmJson, groupByThread } from './dealUtils.js';
+import crypto from 'crypto';
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SlackApp = any;
 
 const DIGEST_CHANNEL = process.env.DEAL_DIGEST_CHANNEL || '';
-const DIGEST_HOUR = parseInt(process.env.DEAL_DIGEST_HOUR, 10) || 7;
+const DIGEST_HOUR = parseInt(process.env.DEAL_DIGEST_HOUR || '', 10) || 7;
+
+interface DigestMessage {
+  user_id?: string;
+  user_name?: string;
+  user?: string;
+  message_text?: string;
+  text?: string;
+  created_at: string;
+  thread_ts?: string;
+}
+
+interface DigestResult {
+  html_note: string;
+  action_items: { subject: string; owner?: string }[];
+  has_meaningful_content: boolean;
+}
 
 // Zbuduj system prompt z kontekstem firmy i personą
-function buildDigestSystemPrompt() {
+export function buildDigestSystemPrompt(): string {
   const companyContext = loadAllKnowledge();
   const persona = loadKnowledgeFile('bot-persona');
   return `You are a sales intelligence assistant. You create concise Slack conversation summaries for Pipedrive deal notes.
@@ -51,13 +68,14 @@ Return ONLY valid JSON (no markdown):
 If messages are only small talk, set has_meaningful_content to false and return empty html_note.`;
 
 // Oblicz hash wiadomości (do sprawdzania czy coś się zmieniło)
-function computeMessageHash(messages) {
+export function computeMessageHash(messages: DigestMessage[]): string {
   const text = messages.map(m => `${m.user_id || m.user || ''}:${m.message_text || m.text || ''}`).join('|');
   return crypto.createHash('md5').update(text).digest('hex');
 }
 
 // Pobierz stan digestu dla kanału/wątku
-async function getDigestState(channelId) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function getDigestState(channelId: string): Promise<any> {
   try {
     const { data } = await supabase
       .from('deal_digest_state')
@@ -71,7 +89,7 @@ async function getDigestState(channelId) {
 }
 
 // Zapisz stan digestu
-async function saveDigestState(channelId, lastTs, messageHash, dealId) {
+export async function saveDigestState(channelId: string, lastTs: string, messageHash: string, dealId: number | null): Promise<void> {
   try {
     await supabase.from('deal_digest_state').upsert({
       channel_id: channelId,
@@ -81,12 +99,12 @@ async function saveDigestState(channelId, lastTs, messageHash, dealId) {
       updated_at: new Date().toISOString(),
     }, { onConflict: 'channel_id' });
   } catch (error) {
-    logError('dealDigest', 'Błąd zapisu stanu digestu', error.message);
+    logError('dealDigest', 'Błąd zapisu stanu digestu', (error as Error).message);
   }
 }
 
 // Pobierz nowe wiadomości z kanału od ostatniego runu (z Supabase slack_messages)
-async function getNewMessages(channelId, lastTs = null) {
+export async function getNewMessages(channelId: string, lastTs: string | null = null): Promise<DigestMessage[]> {
   try {
     let query = supabase
       .from('slack_messages')
@@ -105,15 +123,15 @@ async function getNewMessages(channelId, lastTs = null) {
 
     const { data, error } = await query;
     if (error) throw error;
-    return data || [];
+    return (data || []) as DigestMessage[];
   } catch (error) {
-    logError('dealDigest', `Błąd pobierania wiadomości kanału ${channelId}`, error.message);
+    logError('dealDigest', `Błąd pobierania wiadomości kanału ${channelId}`, (error as Error).message);
     return [];
   }
 }
 
 // Formatuj wiadomości do tekstu dla LLM
-function formatMessages(messages) {
+export function formatMessages(messages: DigestMessage[]): string {
   return messages.map(m => {
     const name = m.user_name || m.user_id || 'unknown';
     const time = new Date(m.created_at).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
@@ -122,7 +140,8 @@ function formatMessages(messages) {
 }
 
 // Wygeneruj podsumowanie przez Claude
-async function generateSummary(messages, deal) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function generateSummary(messages: DigestMessage[], deal: any): Promise<DigestResult | null> {
   const messagesText = formatMessages(messages);
   const timestamps = messages.map(m => new Date(m.created_at).getTime());
   const dateFrom = new Date(Math.min(...timestamps)).toISOString().split('T')[0];
@@ -131,7 +150,7 @@ async function generateSummary(messages, deal) {
   const orgPart = orgName ? ` (${orgName})` : '';
 
   try {
-    const response = await client.messages.create({
+    const response = await anthropic.messages.create({
       model: MODEL_SONNET,
       max_tokens: 2000,
       system: buildDigestSystemPrompt(),
@@ -146,7 +165,7 @@ async function generateSummary(messages, deal) {
       }],
     });
 
-    const result = cleanLlmJson(response.content[0].text);
+    const result = cleanLlmJson((response.content[0] as { text: string }).text) as unknown as DigestResult;
 
     if (!result.has_meaningful_content) return null;
 
@@ -155,13 +174,13 @@ async function generateSummary(messages, deal) {
     result.html_note = `<b>${NOTE_PREFIX} ${today} (${dateFrom} - ${dateTo})</b><br><br>${result.html_note}`;
     return result;
   } catch (error) {
-    logError('dealDigest', `Błąd generowania podsumowania dla '${deal.title}'`, error.message);
+    logError('dealDigest', `Błąd generowania podsumowania dla '${deal.title}'`, (error as Error).message);
     return null;
   }
 }
 
 // Zapisz podsumowanie do Pipedrive
-async function writeSummaryToPipedrive(dealId, result) {
+async function writeSummaryToPipedrive(dealId: number, result: DigestResult): Promise<void> {
   const notes = await getDealNotes(dealId);
   const existingNote = findAgentNote(notes, NOTE_PREFIX);
 
@@ -181,7 +200,7 @@ async function writeSummaryToPipedrive(dealId, result) {
 }
 
 // Główna pętla digestu — przetwórz kanały dedykowane (#sales-*)
-async function processDedicatedChannel(app, channelId, channelName) {
+export async function processDedicatedChannel(app: SlackApp, channelId: string, channelName: string): Promise<number> {
   const state = await getDigestState(channelId);
   const messages = await getNewMessages(channelId, state?.last_ts);
 
@@ -207,13 +226,13 @@ async function processDedicatedChannel(app, channelId, channelName) {
 }
 
 // Przetwórz pojedynczy wątek z shared channel
-async function processThread(channelId, channelName, threadTs, threadMsgs) {
+async function processThread(channelId: string, channelName: string, threadTs: string, threadMsgs: DigestMessage[]): Promise<number> {
   const threadKey = `${channelId}:${threadTs}`;
   const threadState = await getDigestState(threadKey);
   const hash = computeMessageHash(threadMsgs);
   if (hash === threadState?.message_hash) return 0;
 
-  const deal = await resolveThreadToDeal(threadMsgs, channelName, channelId, threadTs);
+  const deal = await resolveThreadToDeal(threadMsgs as unknown[], channelName, channelId, threadTs);
   if (!deal) return 0;
 
   const result = await generateSummary(threadMsgs, deal);
@@ -228,16 +247,16 @@ async function processThread(channelId, channelName, threadTs, threadMsgs) {
 }
 
 // Przetwórz kanał shared (wątki pojedynczo)
-async function processSharedChannel(app, channelId, channelName) {
+export async function processSharedChannel(app: SlackApp, channelId: string, channelName: string): Promise<number> {
   const state = await getDigestState(channelId);
   const messages = await getNewMessages(channelId, state?.last_ts);
   if (messages.length === 0) return 0;
 
-  const threads = groupByThread(messages);
+  const threads = groupByThread(messages as unknown[]);
   let written = 0;
   for (const [threadTs, threadMsgs] of Object.entries(threads)) {
     if (threadTs === 'main' || threadMsgs.length < MIN_MESSAGES) continue;
-    written += await processThread(channelId, channelName, threadTs, threadMsgs);
+    written += await processThread(channelId, channelName, threadTs, threadMsgs as DigestMessage[]);
   }
 
   // Zaktualizuj ogólny stan kanału
@@ -247,33 +266,36 @@ async function processSharedChannel(app, channelId, channelName) {
 }
 
 // Pobierz listę publicznych kanałów ze Slack (1 API call zamiast N+1)
-async function listChannels(app) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function listChannels(app: SlackApp): Promise<any[]> {
   try {
     const result = await app.client.conversations.list({
       types: 'public_channel', limit: 1000, exclude_archived: true,
     });
     return result.channels || [];
   } catch (error) {
-    logError('dealDigest', 'Błąd listowania kanałów', error.message);
+    logError('dealDigest', 'Błąd listowania kanałów', (error as Error).message);
     return [];
   }
 }
 
 // Uruchom daily digest
-async function runDailyDigest(app) {
+async function runDailyDigest(app: SlackApp): Promise<void> {
   console.log('[dealDigest] Start daily digest...');
   let totalSummaries = 0;
   const allChannels = await listChannels(app);
 
   // 1. Kanały dedykowane (#sales-*)
-  const salesChannels = allChannels.filter(ch => ch.name.startsWith(SALES_PREFIX));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const salesChannels = allChannels.filter((ch: any) => ch.name.startsWith(SALES_PREFIX));
   for (const ch of salesChannels) {
     totalSummaries += await processDedicatedChannel(app, ch.id, ch.name);
   }
 
   // 2. Kanały monitorowane (shared, wątki per deal)
   for (const name of MONITORED_CHANNELS) {
-    const ch = allChannels.find(c => c.name === name);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ch = allChannels.find((c: any) => c.name === name);
     if (!ch) {
       console.log(`[dealDigest] Kanał '${name}' nie znaleziony — pomijam`);
       continue;
@@ -291,20 +313,20 @@ async function runDailyDigest(app) {
         text: `📊 *Deal Digest* — zapisano ${totalSummaries} podsumowań do Pipedrive.`,
       });
     } catch (error) {
-      logError('dealDigest', 'Błąd wysyłania statusu', error.message);
+      logError('dealDigest', 'Błąd wysyłania statusu', (error as Error).message);
     }
   }
 }
 
 // Sprawdź czy to pora na digest (Pn-Pt o DIGEST_HOUR)
-function isDigestTime(now) {
+export function isDigestTime(now: Date): boolean {
   const day = now.getDay();
   const hour = now.getHours();
   return day >= 1 && day <= 5 && hour === DIGEST_HOUR;
 }
 
 // Włącz scheduled digest (sprawdza co godzinę)
-function setupDealDigest(app) {
+export function setupDealDigest(app: SlackApp): void {
   if (!process.env.PIPEDRIVE_API_TOKEN) {
     console.log('[dealDigest] Brak PIPEDRIVE_API_TOKEN — digest wyłączony');
     return;
@@ -318,17 +340,3 @@ function setupDealDigest(app) {
 
   console.log(`[dealDigest] Daily digest włączony (Pn-Pt o ${DIGEST_HOUR}:00)`);
 }
-
-module.exports = {
-  setupDealDigest,
-  runDailyDigest,
-  isDigestTime,
-  computeMessageHash,
-  generateSummary,
-  formatMessages,
-  getNewMessages,
-  getDigestState,
-  saveDigestState,
-  processDedicatedChannel,
-  processSharedChannel,
-};

@@ -1,14 +1,19 @@
-// src/handlers/slash.js — obsługa komendy /iwan
-const { searchSlackHistory, buildContextFromMessages } = require('../services/search');
-const { searchNotion, getPageTitle, getPageText } = require('../services/notion');
-const { getTimeline, getEmployees, getProjects, buildDateRange, getUtilPercent, getAllocPercent } = require('../services/workforce');
-const { searchDeals, getDeal, getDealNotes, getActiveDeals, buildContextFromDeal, isPipedriveEnabled } = require('../services/pipedrive');
-const { ACTIVE_PIPELINES } = require('../services/dealConfig');
-const { resolveUserNames } = require('../services/users');
-const { logError } = require('../services/errors');
+// src/handlers/slash.ts — obsługa komendy /iwan
+import { searchSlackHistory, buildContextFromMessages } from '../services/search.js';
+import { searchNotion, getPageTitle, getPageText } from '../services/notion.js';
+import { getTimeline, getProjects, buildDateRange, getUtilPercent, getAllocPercent } from '../services/workforce.js';
+import { searchDeals, getDeal, getDealNotes, getActiveDeals, buildContextFromDeal, isPipedriveEnabled } from '../services/pipedrive.js';
+import { ACTIVE_PIPELINES } from '../services/dealConfig.js';
+import { resolveUserNames } from '../services/users.js';
+import { logError } from '../services/errors.js';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SlackApp = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type RespondFn = (...args: any[]) => Promise<void>;
 
 // Parsuj komendę: /iwan szukaj <fraza> lub /iwan status
-function parseCommand(text) {
+export function parseCommand(text: string): { action: string; args: string } {
   const parts = text.trim().split(/\s+/);
   const action = (parts[0] || '').toLowerCase();
   const args = parts.slice(1).join(' ');
@@ -18,8 +23,9 @@ function parseCommand(text) {
 const ALLOWED_CHANNELS = (process.env.SLACK_ALLOWED_CHANNELS || '').split(',').filter(Boolean);
 
 // Handler slash command /iwan
-function setupSlashCommand(app) {
-  app.command('/iwan', async ({ command, ack, respond }) => {
+export function setupSlashCommand(app: SlackApp): void {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  app.command('/iwan', async ({ command, ack, respond }: any) => {
     await ack();
 
     // Ogranicz do dozwolonych kanałów (jeśli lista ustawiona)
@@ -55,7 +61,8 @@ function setupSlashCommand(app) {
 }
 
 // /iwan szukaj <fraza> — wyszukaj w historii kanału
-async function handleSearch(app, command, query, respond) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function handleSearch(app: SlackApp, command: any, query: string, respond: RespondFn): Promise<void> {
   if (!query) {
     await respond('Użycie: `/iwan szukaj <fraza>`');
     return;
@@ -79,7 +86,7 @@ async function handleSearch(app, command, query, respond) {
 }
 
 // /iwan notion <fraza> — wyszukaj w Notion
-async function handleNotion(query, respond) {
+async function handleNotion(query: string, respond: RespondFn): Promise<void> {
   if (!query) {
     await respond('Użycie: `/iwan notion <fraza>`');
     return;
@@ -92,7 +99,7 @@ async function handleNotion(query, respond) {
     return;
   }
 
-  const lista = [];
+  const lista: string[] = [];
   for (const page of pages.slice(0, 5)) {
     const title = getPageTitle(page);
     const text = await getPageText(page.id);
@@ -104,7 +111,7 @@ async function handleNotion(query, respond) {
 }
 
 // /iwan status — pokaż status bota
-async function handleStatus(respond) {
+async function handleStatus(respond: RespondFn): Promise<void> {
   const uptime = process.uptime();
   const hours = Math.floor(uptime / 3600);
   const minutes = Math.floor((uptime % 3600) / 60);
@@ -119,7 +126,7 @@ async function handleStatus(respond) {
 }
 
 // /iwan team <nazwa> — utylizacja zespołu
-async function handleTeam(teamName, respond) {
+async function handleTeam(teamName: string, respond: RespondFn): Promise<void> {
   if (!teamName) {
     await respond('Użycie: `/iwan team <nazwa>` (np. Frontend, Backend, QA)');
     return;
@@ -138,10 +145,12 @@ async function handleTeam(teamName, respond) {
     const endStr = endDate.toISOString().split('T')[0];
 
     const data = await getTimeline(startStr, endStr);
-    const employees = Array.isArray(data) ? data : (data.employees || data.data || []);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const employees: any[] = Array.isArray(data) ? data : ((data as any).employees || (data as any).data || []);
 
     const lowerTeam = teamName.toLowerCase();
-    const teamMembers = employees.filter(e => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const teamMembers = employees.filter((e: any) => {
       const t = (e.team || e.department || '').toLowerCase();
       return t.includes(lowerTeam);
     });
@@ -151,19 +160,21 @@ async function handleTeam(teamName, respond) {
       return;
     }
 
-    const lines = teamMembers.map(emp => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const lines = teamMembers.map((emp: any) => {
       const name = emp.name || `${emp.first_name || ''} ${emp.last_name || ''}`.trim();
       const assignments = emp.assignments || [];
       const utilization = emp.utilization || {};
       const utilVals = Object.values(utilization).map(getUtilPercent);
       const avgUtil = utilVals.length > 0
-        ? Math.round(utilVals.reduce((a, b) => a + b, 0) / utilVals.length)
+        ? Math.round(utilVals.reduce((a: number, b: number) => a + b, 0) / utilVals.length)
         : 0;
 
       if (assignments.length === 0) {
         return `• *${name}*: bench (0%)`;
       }
-      const projs = assignments.map(a => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const projs = assignments.map((a: any) => {
         const proj = a.project_name || a.project || '?';
         const alloc = getAllocPercent(a);
         return `${proj} (${alloc}%)`;
@@ -174,13 +185,13 @@ async function handleTeam(teamName, respond) {
 
     await respond(`*Team ${teamName}:*\n${lines.join('\n')}`);
   } catch (error) {
-    logError('slash-team', 'Błąd pobierania danych zespołu', error.message);
+    logError('slash-team', 'Błąd pobierania danych zespołu', (error as Error).message);
     await respond('Błąd pobierania danych z Workforce Planner.');
   }
 }
 
 // /iwan kto-wolny [miesiąc] — kto jest dostępny
-async function handleKtoWolny(args, respond) {
+async function handleKtoWolny(args: string, respond: RespondFn): Promise<void> {
   if (!process.env.WP_API_URL) {
     await respond('Workforce Planner nie jest skonfigurowany.');
     return;
@@ -191,14 +202,16 @@ async function handleKtoWolny(args, respond) {
     const { startDate, endDate } = buildDateRange(query || 'teraz');
 
     const data = await getTimeline(startDate, endDate);
-    const employees = Array.isArray(data) ? data : (data.employees || data.data || []);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const employees: any[] = Array.isArray(data) ? data : ((data as any).employees || (data as any).data || []);
 
-    const free = employees.filter(emp => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const free = employees.filter((emp: any) => {
       const assignments = emp.assignments || [];
       const utilization = emp.utilization || {};
       const utilVals = Object.values(utilization).map(getUtilPercent);
       const avgUtil = utilVals.length > 0
-        ? utilVals.reduce((a, b) => a + b, 0) / utilVals.length
+        ? utilVals.reduce((a: number, b: number) => a + b, 0) / utilVals.length
         : 0;
       return assignments.length === 0 || avgUtil < 30;
     });
@@ -208,26 +221,27 @@ async function handleKtoWolny(args, respond) {
       return;
     }
 
-    const lines = free.map(emp => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const lines = free.map((emp: any) => {
       const name = emp.name || `${emp.first_name || ''} ${emp.last_name || ''}`.trim();
       const team = emp.team || emp.department || '';
       const utilization = emp.utilization || {};
       const utilVals = Object.values(utilization).map(getUtilPercent);
       const avgUtil = utilVals.length > 0
-        ? Math.round(utilVals.reduce((a, b) => a + b, 0) / utilVals.length)
+        ? Math.round(utilVals.reduce((a: number, b: number) => a + b, 0) / utilVals.length)
         : 0;
       return `• *${name}* (${team}) — ${avgUtil}%`;
     });
 
     await respond(`*Wolni/dostępni (${startDate} — ${endDate}):*\n${lines.join('\n')}`);
   } catch (error) {
-    logError('slash-kto-wolny', 'Błąd pobierania wolnych', error.message);
+    logError('slash-kto-wolny', 'Błąd pobierania wolnych', (error as Error).message);
     await respond('Błąd pobierania danych z Workforce Planner.');
   }
 }
 
 // /iwan overbooking — lista przeciążonych
-async function handleOverbooking(respond) {
+async function handleOverbooking(respond: RespondFn): Promise<void> {
   if (!process.env.WP_API_URL) {
     await respond('Workforce Planner nie jest skonfigurowany.');
     return;
@@ -241,9 +255,11 @@ async function handleOverbooking(respond) {
     const endStr = endDate.toISOString().split('T')[0];
 
     const data = await getTimeline(startStr, endStr);
-    const employees = Array.isArray(data) ? data : (data.employees || data.data || []);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const employees: any[] = Array.isArray(data) ? data : ((data as any).employees || (data as any).data || []);
 
-    const overbooked = [];
+    const overbooked: string[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const emp of employees) {
       const name = emp.name || `${emp.first_name || ''} ${emp.last_name || ''}`.trim();
       const team = emp.team || emp.department || '';
@@ -264,13 +280,13 @@ async function handleOverbooking(respond) {
 
     await respond(`*Overbooking (${startStr} — ${endStr}):*\n${overbooked.join('\n')}`);
   } catch (error) {
-    logError('slash-overbooking', 'Błąd pobierania overbookingu', error.message);
+    logError('slash-overbooking', 'Błąd pobierania overbookingu', (error as Error).message);
     await respond('Błąd pobierania danych z Workforce Planner.');
   }
 }
 
 // /iwan projekty — aktywne projekty z ludźmi
-async function handleProjekty(respond) {
+async function handleProjekty(respond: RespondFn): Promise<void> {
   if (!process.env.WP_API_URL) {
     await respond('Workforce Planner nie jest skonfigurowany.');
     return;
@@ -278,14 +294,16 @@ async function handleProjekty(respond) {
 
   try {
     const projects = await getProjects();
-    const projectList = Array.isArray(projects) ? projects : (projects.data || projects.projects || []);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const projectList: any[] = Array.isArray(projects) ? projects : ((projects as any).data || (projects as any).projects || []);
 
     if (projectList.length === 0) {
       await respond('Brak aktywnych projektów w Workforce Planner.');
       return;
     }
 
-    const lines = projectList.slice(0, 15).map(p => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const lines = projectList.slice(0, 15).map((p: any) => {
       const name = p.name || p.project_name || '?';
       const members = p.members || p.employees || [];
       const count = Array.isArray(members) ? members.length : 0;
@@ -295,13 +313,13 @@ async function handleProjekty(respond) {
 
     await respond(`*Aktywne projekty:*\n${lines.join('\n')}`);
   } catch (error) {
-    logError('slash-projekty', 'Błąd pobierania projektów', error.message);
+    logError('slash-projekty', 'Błąd pobierania projektów', (error as Error).message);
     await respond('Błąd pobierania danych z Workforce Planner.');
   }
 }
 
 // /iwan deal <nazwa> — status deala z Pipedrive
-async function handleDeal(dealName, respond) {
+async function handleDeal(dealName: string, respond: RespondFn): Promise<void> {
   if (!dealName) {
     await respond('Użycie: `/iwan deal <nazwa>` (np. `/iwan deal Acme`)');
     return;
@@ -348,13 +366,13 @@ async function handleDeal(dealName, respond) {
 
     await respond(lines.join('\n'));
   } catch (error) {
-    logError('slash-deal', 'Błąd pobierania deala', error.message);
+    logError('slash-deal', 'Błąd pobierania deala', (error as Error).message);
     await respond('Błąd pobierania danych z Pipedrive.');
   }
 }
 
 // /iwan deals [pipeline_id] — lista aktywnych deali
-async function handleDeals(args, respond) {
+async function handleDeals(args: string, respond: RespondFn): Promise<void> {
   if (!isPipedriveEnabled()) {
     await respond('Pipedrive nie jest skonfigurowany.');
     return;
@@ -370,7 +388,8 @@ async function handleDeals(args, respond) {
       return;
     }
 
-    const lines = deals.slice(0, 20).map(d => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const lines = deals.slice(0, 20).map((d: any) => {
       const ownerName = d.owner_name || d.user_id?.name || '?';
       const orgName = d.org_name || d.org_id?.name || '';
       const value = d.value ? ` — ${d.value} ${d.currency || ''}` : '';
@@ -380,13 +399,13 @@ async function handleDeals(args, respond) {
     const total = deals.length > 20 ? ` (pokazuję 20/${deals.length})` : '';
     await respond(`*Aktywne deale${total}:*\n${lines.join('\n')}`);
   } catch (error) {
-    logError('slash-deals', 'Błąd pobierania deali', error.message);
+    logError('slash-deals', 'Błąd pobierania deali', (error as Error).message);
     await respond('Błąd pobierania danych z Pipedrive.');
   }
 }
 
 // /iwan (bez argumentów) — pokaż pomoc
-async function handleHelp(respond) {
+async function handleHelp(respond: RespondFn): Promise<void> {
   await respond(
     `*Komendy Iwana:*\n` +
     `• \`/iwan szukaj <fraza>\` — szukaj w historii kanału\n` +
@@ -401,5 +420,3 @@ async function handleHelp(respond) {
     `• Lub po prostu napisz \`@Iwan <pytanie>\``
   );
 }
-
-module.exports = { setupSlashCommand, parseCommand };

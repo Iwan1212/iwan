@@ -1,19 +1,30 @@
-// src/proactive/engine.js — główny orkiestrator trybu proaktywnego
-const { isProactiveChannel } = require('./channelResolver');
-const { trackThreadMessage, markThreadResponded } = require('./threadTracker');
-const { trackChannelMessage, markChannelResponded } = require('./channelCounter');
-const { detectTopics } = require('./topicDetector');
-const { shouldIwanRespond } = require('./proactiveClassify');
-const { checkProactiveRateLimit, recordProactiveResponse } = require('./proactiveRatelimit');
-const { sendProactiveResponse } = require('./proactiveRespond');
-const { getCompanyContext } = require('../services/context');
+// src/proactive/engine.ts — główny orkiestrator trybu proaktywnego
+import { isProactiveChannel } from './channelResolver.js';
+import { trackThreadMessage, markThreadResponded } from './threadTracker.js';
+import { trackChannelMessage, markChannelResponded } from './channelCounter.js';
+import { detectTopics } from './topicDetector.js';
+import { shouldIwanRespond } from './proactiveClassify.js';
+import { checkProactiveRateLimit, recordProactiveResponse } from './proactiveRatelimit.js';
+import { sendProactiveResponse } from './proactiveRespond.js';
+import { getCompanyContext } from '../services/context.js';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SlackApp = any;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+interface SlackMessage {
+  channel: string;
+  thread_ts?: string;
+  ts: string;
+  text?: string;
+}
 
 // Set zapobiegający race conditions (dwa msg w tym samym wątku naraz)
-const inProgress = new Set();
+const inProgress = new Set<string>();
 
 // Zbierz wszystkie triggery dla wiadomości
-function collectTriggers(message, channelId) {
-  const triggers = [];
+export function collectTriggers(message: SlackMessage, channelId: string): string[] {
+  const triggers: string[] = [];
 
   // 1. Thread trigger — wątek z >= N wiadomościami
   if (message.thread_ts) {
@@ -32,7 +43,7 @@ function collectTriggers(message, channelId) {
   }
 
   // 3. Topic detection — wykrycie tematu
-  const topics = detectTopics(message.text);
+  const topics = detectTopics(message.text || '');
   if (topics.length > 0) {
     triggers.push(`topic:${topics.join(',')}`);
   }
@@ -41,7 +52,7 @@ function collectTriggers(message, channelId) {
 }
 
 // Pobierz kontekst rozmowy (ostatnie wiadomości z wątku lub kanału)
-async function getConversationContext(app, message) {
+export async function getConversationContext(app: SlackApp, message: SlackMessage): Promise<string> {
   try {
     if (message.thread_ts) {
       const result = await app.client.conversations.replies({
@@ -50,7 +61,7 @@ async function getConversationContext(app, message) {
         limit: 20,
       });
       const msgs = result.messages || [];
-      return msgs.map(m => `${m.user || 'bot'}: ${m.text || ''}`).join('\n').substring(0, 3000);
+      return msgs.map((m: Record<string, string>) => `${m.user || 'bot'}: ${m.text || ''}`).join('\n').substring(0, 3000);
     }
 
     // Kanał — ostatnie 10 wiadomości
@@ -59,15 +70,15 @@ async function getConversationContext(app, message) {
       limit: 10,
     });
     const msgs = (result.messages || []).reverse();
-    return msgs.map(m => `${m.user || 'bot'}: ${m.text || ''}`).join('\n').substring(0, 3000);
+    return msgs.map((m: Record<string, string>) => `${m.user || 'bot'}: ${m.text || ''}`).join('\n').substring(0, 3000);
   } catch (error) {
-    console.error('[proactive] Błąd pobierania kontekstu:', error.message);
+    console.error('[proactive] Błąd pobierania kontekstu:', (error as Error).message);
     return message.text || '';
   }
 }
 
 // Główny pipeline ewaluacji wiadomości
-async function evaluateMessage(app, message, channelName) {
+export async function evaluateMessage(app: SlackApp, message: SlackMessage, channelName: string): Promise<void> {
   const channelId = message.channel;
 
   // 1. Czy kanał jest proaktywny?
@@ -108,7 +119,7 @@ async function evaluateMessage(app, message, channelName) {
     }
 
     // 8. Wygeneruj i wyślij odpowiedź (ZAWSZE w wątku — message.ts jako fallback)
-    const companyContext = await getCompanyContext(message.text);
+    const companyContext = await getCompanyContext(message.text || '');
     const threadTs = message.thread_ts || message.ts;
     await sendProactiveResponse(app, channelId, threadTs, conversationText, triggerReason, companyContext);
 
@@ -119,15 +130,13 @@ async function evaluateMessage(app, message, channelName) {
       markChannelResponded(channelId);
     }
   } catch (error) {
-    console.error(`[proactive] Błąd pipeline:`, error.message);
+    console.error(`[proactive] Błąd pipeline:`, (error as Error).message);
   } finally {
     inProgress.delete(lockKey);
   }
 }
 
 // Eksportuj inProgress do testów
-function _getInProgress() {
+export function _getInProgress(): Set<string> {
   return inProgress;
 }
-
-module.exports = { evaluateMessage, collectTriggers, getConversationContext, _getInProgress };

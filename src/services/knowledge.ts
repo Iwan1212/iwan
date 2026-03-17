@@ -1,16 +1,16 @@
-// src/services/knowledge.js — ładowanie plików wiedzy z knowledge/*.md
-const fs = require('fs');
-const path = require('path');
-const { logError } = require('./errors');
+// src/services/knowledge.ts — ładowanie plików wiedzy z knowledge/*.md
+import fs from 'fs';
+import path from 'path';
+import { logError } from './errors.js';
 
 const KNOWLEDGE_DIR = path.join(__dirname, '..', '..', 'knowledge');
 
 // Cache załadowanych plików (ładujemy raz przy starcie)
-const cache = new Map();
+const cache = new Map<string, string>();
 
 // Załaduj wszystkie pliki .md z katalogu knowledge/
-function loadAllKnowledge() {
-  if (cache.has('_all')) return cache.get('_all');
+export function loadAllKnowledge(): string {
+  if (cache.has('_all')) return cache.get('_all')!;
 
   if (!fs.existsSync(KNOWLEDGE_DIR)) {
     console.log('[knowledge] Brak katalogu knowledge/ — pomijam');
@@ -23,7 +23,7 @@ function loadAllKnowledge() {
       .filter(f => f.endsWith('.md'))
       .sort();
 
-    const parts = [];
+    const parts: string[] = [];
     for (const file of files) {
       const content = fs.readFileSync(path.join(KNOWLEDGE_DIR, file), 'utf-8').trim();
       if (content) {
@@ -36,15 +36,15 @@ function loadAllKnowledge() {
     cache.set('_all', result);
     return result;
   } catch (error) {
-    logError('knowledge', 'Błąd ładowania plików wiedzy', error.message);
+    logError('knowledge', 'Błąd ładowania plików wiedzy', (error as Error).message);
     cache.set('_all', '');
     return '';
   }
 }
 
 // Załaduj konkretny plik po nazwie (np. 'bot-persona' → knowledge/bot-persona.md)
-function loadKnowledgeFile(name) {
-  if (cache.has(name)) return cache.get(name);
+export function loadKnowledgeFile(name: string): string {
+  if (cache.has(name)) return cache.get(name)!;
 
   const filePath = path.join(KNOWLEDGE_DIR, `${name}.md`);
   if (!fs.existsSync(filePath)) {
@@ -57,15 +57,13 @@ function loadKnowledgeFile(name) {
     cache.set(name, content);
     return content;
   } catch (error) {
-    logError('knowledge', `Błąd ładowania ${name}.md`, error.message);
+    logError('knowledge', `Błąd ładowania ${name}.md`, (error as Error).message);
     cache.set(name, '');
     return '';
   }
 }
 
 // Wyczyść cache (do testów / hot-reload)
-function clearKnowledgeCache() {
+export function clearKnowledgeCache(): void {
   cache.clear();
 }
-
-module.exports = { loadAllKnowledge, loadKnowledgeFile, clearKnowledgeCache };
