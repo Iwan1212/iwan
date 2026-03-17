@@ -5,14 +5,15 @@ Open-source AI agent Slack. Crawluje wiadomości z kanałów, odpowiada na pytan
 
 ## Stack (v0.5 → v1.0 upgrade w toku)
 - Runtime: Node.js 20 LTS
+- Język: TypeScript (strict, NodeNext)
 - Slack: @slack/bolt (Socket Mode)
 - AI: @anthropic-ai/sdk (claude-sonnet-4-20250514)
 - Baza: Supabase (PostgreSQL, full-text search)
 - Hosting: Railway
-- Docker: Node 20 Alpine, docker-compose (Dockerfile + docker-compose.yml)
-- CI: GitHub Actions (npm ci, npm test, node --check)
-- Testy: Jest 29, 39 suites, 363 assertions
-- Pliki: 42 źródłowe, 39 testów
+- Docker: Node 20 Alpine, multi-stage build (tsc → dist/)
+- CI: GitHub Actions (npm ci, npm run typecheck, npm test)
+- Testy: Jest 29 (ts-jest), 39 suites, 363 assertions
+- Pliki: 42 źródłowe (.ts), 39 testów (.js)
 
 ## Upgrade Plan v0.5 → v1.0 (OpenViktor level)
 Cel: 7.5/10+ — kolejność faz: resilience → features → optymalizacja → tooling
@@ -20,7 +21,7 @@ Cel: 7.5/10+ — kolejność faz: resilience → features → optymalizacja → 
 | Faza | Co | Status |
 |------|----|--------|
 | 0 | Docker + CI/CD | DONE |
-| 1 | TypeScript migration | do zrobienia |
+| 1 | TypeScript migration | DONE |
 | 2 | Multi-Provider LLM | do zrobienia |
 | 3 | Write Tools (Notion, Slack, Pipedrive) | do zrobienia |
 | 4 | Redis Cache | do zrobienia |
@@ -46,14 +47,14 @@ Commands: /plan, /tdd, /code-review, /quality-gate, /build-fix, /verify, /model-
 Rules: common/* (9 plików), typescript/* (5 plików)
 
 ## Integracja Pipedrive CRM
-- Klient API: src/services/pipedrive.js (search, get, notes, activities)
-- Deal resolver: src/services/dealResolver.js (Slack kanał → Pipedrive deal, cache w Supabase)
-- Daily digest: src/services/dealDigest.js (Pn-Pt, automatyczne podsumowania → Pipedrive notes)
-- Narzędzia Claude: search_pipedrive, deal_status (w tools.js + toolExecutor.js)
+- Klient API: src/services/pipedrive.ts (search, get, notes, activities)
+- Deal resolver: src/services/dealResolver.ts (Slack kanał → Pipedrive deal, cache w Supabase)
+- Daily digest: src/services/dealDigest.ts (Pn-Pt, automatyczne podsumowania → Pipedrive notes)
+- Narzędzia Claude: search_pipedrive, deal_status (w tools.ts + toolExecutor.ts)
 - Slash commands: /iwan deal <name>, /iwan deals
 - Backfill: scripts/backfillDeals.js (--days N, --dry-run, --deal "Acme")
-- Knowledge system: knowledge/*.md → injected do LLM prompts (src/services/knowledge.js)
-- LLM fallback: src/services/openrouter.js (Anthropic → OpenRouter)
+- Knowledge system: knowledge/*.md → injected do LLM prompts (src/services/knowledge.ts)
+- LLM fallback: src/services/openrouter.ts (Anthropic → OpenRouter)
 - Supabase tabele: deal_channel_mappings, deal_digest_state (scripts/seed-deal-tables.sql)
 
 ## Zasady kodowania
