@@ -8,11 +8,15 @@ services:
       - redis-data:/data
 
   bot:
-    build: .
+    build:
+      context: .
+      dockerfile: apps/bot/Dockerfile
     env_file: .env
     restart: unless-stopped
     depends_on:
       - redis
+    ports:
+      - "3100:3100"
     environment:
       - REDIS_URL=redis://redis:6379
 

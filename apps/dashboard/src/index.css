@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+@theme {
+  /* Momentum brand colors */
+  --color-green-lighter: #F0FDE8;
+  --color-green-light: #CDF8B0;
+  --color-green: #AFF476;
+  --color-green-dark: #75A34F;
+  --color-green-darker: #374D25;
+
+  --color-blue-lighter: #E5E8F8;
+  --color-blue-light: #BBC4F6;
+  --color-blue: #4864FE;
+  --color-blue-dark: #233BC0;
+  --color-blue-darker: #0F2077;
+
+  --color-olive-lighter: #EBEEE9;
+  --color-olive-light: #BFC8B7;
+  --color-olive: #94A685;
+  --color-olive-dark: #636F59;
+  --color-olive-darker: #464E3F;
+
+  --color-beige-lighter: #FAF7F4;
+  --color-beige-light: #F4EEE9;
+  --color-beige: #E6D8CB;
+  --color-beige-dark: #BCB0A6;
+  --color-beige-darker: #6C6660;
+
+  --color-sand-lighter: #EFEEEB;
+  --color-sand-light: #CDC7BC;
+  --color-sand: #AEA38F;
+  --color-sand-dark: #746D5F;
+  --color-sand-darker: #524D43;
+
+  --color-neutral-0: #FFFFFF;
+  --color-neutral-100: #EAEBEE;
+  --color-neutral-200: #D2D6DC;
+  --color-neutral-300: #B8BEC8;
+  --color-neutral-400: #99A2B1;
+  --color-neutral-500: #8792A5;
+  --color-neutral-600: #6E7787;
+  --color-neutral-700: #5A616E;
+  --color-neutral-800: #40454E;
+  --color-neutral-900: #2B2E34;
+
+  --font-family-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-family-serif: 'Georgia', serif;
+}

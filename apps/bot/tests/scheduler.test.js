@@ -63,15 +63,15 @@ describe('listJobs', () => {
     registerJob('job-2', '*/5 * * * *', () => {});
     const list = listJobs();
     expect(list).toHaveLength(2);
-    expect(list[0]).toEqual({ name: 'job-1', expression: '0 8 * * *', lastRun: null });
-    expect(list[1]).toEqual({ name: 'job-2', expression: '*/5 * * * *', lastRun: null });
+    expect(list[0]).toEqual({ name: 'job-1', expression: '0 8 * * *', lastRun: null, lastDurationMs: null });
+    expect(list[1]).toEqual({ name: 'job-2', expression: '*/5 * * * *', lastRun: null, lastDurationMs: null });
   });
 
-  it('nie ujawnia wewnętrznych pól (task, lastDurationMs)', () => {
+  it('nie ujawnia wewnętrznych pól (task, handler)', () => {
     registerJob('job-x', '0 8 * * *', () => {});
     const list = listJobs();
     expect(list[0]).not.toHaveProperty('task');
-    expect(list[0]).not.toHaveProperty('lastDurationMs');
+    expect(list[0]).not.toHaveProperty('handler');
   });
 });
 

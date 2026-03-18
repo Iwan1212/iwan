@@ -250,6 +250,10 @@ setupDealDigest(app);
   // Scentralizowany scheduler — zastępuje wszystkie setInterval
   await initScheduler(app);
 
+  // Dashboard API (warunkowo — ENABLE_DASHBOARD_API=true)
+  const { startApiServer } = await import('./api/server.js');
+  await startApiServer();
+
   console.log('🤖 Iwan działa w Socket Mode!');
 })();
 

@@ -1,46 +1,19 @@
 {
-  "name": "iwan",
+  "name": "iwan-monorepo",
   "version": "0.1.0",
-  "description": "Iwan — Open Source AI Agent for Slack",
-  "main": "dist/src/index.js",
+  "private": true,
+  "description": "Iwan monorepo — Slack AI Agent + Admin Dashboard",
   "scripts": {
-    "start": "node dist/src/index.js",
-    "dev": "tsx src/index.ts",
-    "build": "tsc",
-    "typecheck": "tsc --noEmit",
-    "backfill": "node scripts/backfill.js",
-    "backfill:full": "node scripts/backfillFull.js",
-    "test": "jest"
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "test": "turbo test",
+    "typecheck": "turbo typecheck"
   },
-  "keywords": [
-    "slack",
-    "ai",
-    "agent",
-    "claude",
-    "open-source"
-  ],
-  "author": "Iwan Contributors",
-  "license": "MIT",
+  "devDependencies": {
+    "turbo": "^2.5.0"
+  },
   "engines": {
     "node": "20.x"
   },
-  "dependencies": {
-    "@anthropic-ai/sdk": "^0.78.0",
-    "@notionhq/client": "^5.9.0",
-    "@slack/bolt": "^4.6.0",
-    "@supabase/supabase-js": "^2.97.0",
-    "dotenv": "^17.3.1",
-    "googleapis": "^171.4.0",
-    "ioredis": "^5.10.0",
-    "node-cron": "^4.2.1"
-  },
-  "devDependencies": {
-    "@types/jest": "^30.0.0",
-    "@types/node": "^25.5.0",
-    "@types/node-cron": "^3.0.11",
-    "jest": "^29.7.0",
-    "ts-jest": "^29.4.6",
-    "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
-  }
+  "packageManager": "pnpm@9.15.4"
 }

@@ -1,0 +1,21 @@
+// src/types/index.ts — re-eksport typów z pakietu @iwan/shared
+export type {
+  ValidationResult,
+  RateLimitResult,
+  ChatMessage,
+  ToolDefinition,
+  ToolResult,
+  ToolExecutor,
+  ToolExecutors,
+  CalendarEvent,
+  DateRange,
+  Employee,
+  Assignment,
+  Absence,
+  ErrorLog,
+  SearchResult,
+  SlackMessage,
+  SchedulerJobInfo,
+  CacheStats,
+  HealthStatus,
+} from '@iwan/shared';

@@ -1,6 +1,10 @@
 // src/services/cache.ts — warstwa cache Redis (graceful degradation bez REDIS_URL)
 import Redis from 'ioredis';
 import { logError } from './errors.js';
+import { CACHE_TTL } from '@iwan/shared';
+import type { CacheStats } from '@iwan/shared';
+
+export { CACHE_TTL };
 
 // Klient Redis — null gdy brak REDIS_URL (app działa bez cache)
 const redis: Redis | null = process.env.REDIS_URL
@@ -14,21 +18,6 @@ if (redis) {
   redis.on('error', (err) => logError('cache', 'Redis error', err.message));
   redis.on('connect', () => console.log('[cache] Połączono z Redis'));
 }
-
-// TTL (sekundy)
-export const CACHE_TTL = {
-  NOTION_SEARCH: 30 * 60,
-  NOTION_PAGE: 60 * 60,
-  PIPEDRIVE_SEARCH: 15 * 60,
-  PIPEDRIVE_DEAL: 30 * 60,
-  PIPEDRIVE_NOTES: 30 * 60,
-  WORKFORCE_TIMELINE: 2 * 60 * 60,
-  CALENDAR_EVENTS: 30 * 60,
-  CALAMARI_ABSENCES: 60 * 60,
-  USER_NAME: 24 * 60 * 60,
-  CHANNEL_NAME: 24 * 60 * 60,
-  WORKFORCE_ANOMALY_SNAPSHOT: 90000,
-} as const;
 
 // Sprawdź czy Redis jest dostępny
 export function isRedisEnabled(): boolean {
@@ -77,6 +66,30 @@ export async function invalidateCache(pattern: string): Promise<void> {
     }
   } catch (err) {
     logError('cache', `Błąd invalidacji wzorca ${pattern}`, (err as Error).message);
+  }
+}
+
+// Statystyki Redis (dla dashboard API)
+export async function getCacheStats(): Promise<CacheStats> {
+  if (!redis) {
+    return { connected: false, usedMemory: '0B', keyCount: 0, connectedClients: 0, uptimeSeconds: 0 };
+  }
+  try {
+    const info = await redis.info();
+    const get = (key: string): string => {
+      const match = info.match(new RegExp(`${key}:(.+?)\\r?\\n`));
+      return match?.[1]?.trim() ?? '0';
+    };
+    const dbsize = await redis.dbsize();
+    return {
+      connected: redis.status === 'ready',
+      usedMemory: get('used_memory_human'),
+      keyCount: dbsize,
+      connectedClients: parseInt(get('connected_clients'), 10),
+      uptimeSeconds: parseInt(get('uptime_in_seconds'), 10),
+    };
+  } catch {
+    return { connected: false, usedMemory: '0B', keyCount: 0, connectedClients: 0, uptimeSeconds: 0 };
   }
 }
 

@@ -9,6 +9,7 @@ interface ScheduledJob {
   name: string;
   expression: string;
   task: ScheduledTask;
+  handler: () => Promise<void> | void;
   lastRun: Date | null;
   lastDurationMs: number | null;
 }
@@ -39,17 +40,36 @@ export function registerJob(name: string, expression: string, handler: () => Pro
     }
   }, { timezone: 'Europe/Warsaw' });
 
-  jobs.set(name, { name, expression, task, lastRun: null, lastDurationMs: null });
+  jobs.set(name, { name, expression, task, handler, lastRun: null, lastDurationMs: null });
   console.log(`[scheduler] Registered '${name}' (${expression})`);
 }
 
-// Lista zarejestrowanych zadań
-export function listJobs(): { name: string; expression: string; lastRun: Date | null }[] {
+// Lista zarejestrowanych zadań (z czasem trwania)
+export function listJobs(): { name: string; expression: string; lastRun: Date | null; lastDurationMs: number | null }[] {
   return [...jobs.values()].map(j => ({
     name: j.name,
     expression: j.expression,
     lastRun: j.lastRun,
+    lastDurationMs: j.lastDurationMs,
   }));
+}
+
+// Ręczne uruchomienie joba (z dashboard API)
+export async function runJob(name: string): Promise<boolean> {
+  const job = jobs.get(name);
+  if (!job) return false;
+  const start = Date.now();
+  console.log(`[scheduler] Manual trigger '${name}'...`);
+  try {
+    await job.handler();
+    job.lastRun = new Date();
+    job.lastDurationMs = Date.now() - start;
+    console.log(`[scheduler] Manual '${name}' done (${job.lastDurationMs}ms)`);
+    return true;
+  } catch (error) {
+    logError('scheduler', `Manual trigger '${name}' failed`, (error as Error).message);
+    return false;
+  }
 }
 
 // Zatrzymaj wszystkie zadania (graceful shutdown)

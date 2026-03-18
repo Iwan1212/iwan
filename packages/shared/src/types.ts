@@ -1,4 +1,4 @@
-// src/types/index.ts — wspólne interfejsy projektu Iwan
+// packages/shared/src/types.ts — wspólne interfejsy projektu Iwan
 
 export interface ValidationResult {
   valid: boolean;
@@ -107,4 +107,31 @@ export interface SlackMessage {
   ts: string;
   bot_id?: string;
   subtype?: string;
+}
+
+// Dashboard-specific types
+
+export interface SchedulerJobInfo {
+  name: string;
+  expression: string;
+  lastRun: string | null;
+  lastDurationMs: number | null;
+  status: 'idle' | 'running' | 'error';
+}
+
+export interface CacheStats {
+  connected: boolean;
+  usedMemory: string;
+  keyCount: number;
+  connectedClients: number;
+  uptimeSeconds: number;
+}
+
+export interface HealthStatus {
+  status: 'ok' | 'degraded' | 'error';
+  uptime: number;
+  redis: boolean;
+  jobCount: number;
+  version: string;
+  timestamp: string;
 }
