@@ -31,7 +31,7 @@ export async function startApiServer(): Promise<void> {
   server.use(express.static(dashboardDist));
 
   // SPA fallback
-  server.get('*', (_req, res) => {
+  server.get('/{*path}', (_req, res) => {
     res.sendFile(path.join(dashboardDist, 'index.html'));
   });
 
