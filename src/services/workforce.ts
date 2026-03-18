@@ -1,5 +1,6 @@
 // src/services/workforce.ts — integracja z Workforce Planner API
 import { logError } from './errors.js';
+import { withCache, CACHE_TTL } from './cache.js';
 import type { Employee, Assignment, DateRange } from '../types/index.js';
 
 const WP_API_URL = (process.env.WP_API_URL || '').replace(/\/$/, '');
@@ -129,11 +130,13 @@ export async function wpFetch(path: string, params: Record<string, string | numb
 
 // Pobierz timeline alokacji
 export async function getTimeline(startDate: string, endDate: string, options: Record<string, string | number> = {}): Promise<unknown> {
-  return wpFetch('/api/assignments/timeline', {
-    start_date: startDate,
-    end_date: endDate,
-    ...options,
-  });
+  return withCache(`workforce:timeline:${startDate}:${endDate}`, CACHE_TTL.WORKFORCE_TIMELINE, () =>
+    wpFetch('/api/assignments/timeline', {
+      start_date: startDate,
+      end_date: endDate,
+      ...options,
+    })
+  );
 }
 
 // Pobierz listę pracowników

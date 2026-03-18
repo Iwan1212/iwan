@@ -2,6 +2,7 @@
 
 import { google } from 'googleapis';
 import { logError } from './errors.js';
+import { withCache, CACHE_TTL } from './cache.js';
 import type { CalendarEvent, DateRange } from '../types/index.js';
 
 const CALENDAR_IDS = (process.env.GOOGLE_CALENDAR_IDS || '')
@@ -57,30 +58,32 @@ export async function getEvents(startDate: string, endDate: string): Promise<Cal
   if (!cal) return [];
   if (CALENDAR_IDS.length === 0) return [];
 
-  const timeMin = new Date(`${startDate}T00:00:00`).toISOString();
-  const timeMax = new Date(`${endDate}T23:59:59`).toISOString();
+  return withCache(`calendar:events:${startDate}:${endDate}`, CACHE_TTL.CALENDAR_EVENTS, async () => {
+    const timeMin = new Date(`${startDate}T00:00:00`).toISOString();
+    const timeMax = new Date(`${endDate}T23:59:59`).toISOString();
 
-  const results = await Promise.all(
-    CALENDAR_IDS.map(async (calendarId) => {
-      try {
-        const res = await cal.events.list({
-          calendarId,
-          timeMin,
-          timeMax,
-          singleEvents: true,
-          orderBy: 'startTime',
-          timeZone: TIMEZONE,
-          maxResults: 100,
-        });
-        return (res.data.items || []).map(normalizeEvent);
-      } catch (error) {
-        logError('calendar', `Błąd pobierania z ${calendarId}`, (error as Error).message);
-        return [];
-      }
-    })
-  );
+    const results = await Promise.all(
+      CALENDAR_IDS.map(async (calendarId) => {
+        try {
+          const res = await cal.events.list({
+            calendarId,
+            timeMin,
+            timeMax,
+            singleEvents: true,
+            orderBy: 'startTime',
+            timeZone: TIMEZONE,
+            maxResults: 100,
+          });
+          return (res.data.items || []).map(normalizeEvent);
+        } catch (error) {
+          logError('calendar', `Błąd pobierania z ${calendarId}`, (error as Error).message);
+          return [];
+        }
+      })
+    );
 
-  return results.flat();
+    return results.flat();
+  });
 }
 
 // Formatuj czas eventu do czytelnej formy

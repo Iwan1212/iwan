@@ -12,8 +12,8 @@ Open-source AI agent Slack. Crawluje wiadomości z kanałów, odpowiada na pytan
 - Hosting: Railway
 - Docker: Node 20 Alpine, multi-stage build (tsc → dist/)
 - CI: GitHub Actions (npm ci, npm run typecheck, npm test)
-- Testy: Jest 29 (ts-jest), 40 suites, 386 assertions
-- Pliki: 42 źródłowe (.ts), 39 testów (.js)
+- Testy: Jest 29 (ts-jest), 41 suites, 408 assertions
+- Pliki: 43 źródłowe (.ts), 41 testów (.js)
 
 ## Upgrade Plan v0.5 → v1.0 (OpenViktor level)
 Cel: 7.5/10+ — kolejność faz: resilience → features → optymalizacja → tooling
@@ -24,7 +24,7 @@ Cel: 7.5/10+ — kolejność faz: resilience → features → optymalizacja → 
 | 1 | TypeScript migration | DONE |
 | 2 | Multi-Provider LLM | DONE |
 | 3 | Write Tools (Pipedrive + Slack) | DONE |
-| 4 | Redis Cache | do zrobienia |
+| 4 | Redis Cache | DONE |
 | 5 | Proactive 2.0 (cron, digest, anomaly) | do zrobienia |
 | 6 | Dashboard + Monorepo | do zrobienia |
 | 7 | Multi-Workspace | do zrobienia |

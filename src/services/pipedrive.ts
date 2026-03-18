@@ -1,5 +1,6 @@
 // src/services/pipedrive.ts — integracja z Pipedrive CRM API
 import { logError } from './errors.js';
+import { withCache, invalidateCache, CACHE_TTL } from './cache.js';
 
 const PIPEDRIVE_API_TOKEN = process.env.PIPEDRIVE_API_TOKEN || '';
 const PIPEDRIVE_DOMAIN = process.env.PIPEDRIVE_DOMAIN || '';
@@ -75,42 +76,46 @@ interface DealSearchResult {
 // Szukaj deali po nazwie (fuzzy matching)
 export async function searchDeals(term: string, limit = 5): Promise<DealSearchResult[]> {
   if (!isPipedriveEnabled()) return [];
-  try {
-    const result = await pipedriveRequest('GET', 'deals/search', {
-      term, limit, fields: 'title',
-    });
-    const items = result.data?.items || [];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return items.map((item: any) => {
-      const deal = item.item || {};
-      return {
-        id: deal.id,
-        title: deal.title,
-        status: deal.status,
-        org_name: deal.organization?.name || null,
-        owner_name: deal.owner?.name || null,
-        stage: deal.stage?.name || null,
-        value: deal.value,
-        currency: deal.currency,
-      };
-    });
-  } catch (error) {
-    logError('pipedrive', 'Błąd wyszukiwania deali', (error as Error).message);
-    return [];
-  }
+  return withCache(`pipedrive:search:${term}:${limit}`, CACHE_TTL.PIPEDRIVE_SEARCH, async () => {
+    try {
+      const result = await pipedriveRequest('GET', 'deals/search', {
+        term, limit, fields: 'title',
+      });
+      const items = result.data?.items || [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return items.map((item: any) => {
+        const deal = item.item || {};
+        return {
+          id: deal.id,
+          title: deal.title,
+          status: deal.status,
+          org_name: deal.organization?.name || null,
+          owner_name: deal.owner?.name || null,
+          stage: deal.stage?.name || null,
+          value: deal.value,
+          currency: deal.currency,
+        };
+      });
+    } catch (error) {
+      logError('pipedrive', 'Błąd wyszukiwania deali', (error as Error).message);
+      return [];
+    }
+  });
 }
 
 // Pobierz pojedynczy deal po ID
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function getDeal(dealId: number): Promise<any> {
   if (!isPipedriveEnabled()) return null;
-  try {
-    const result = await pipedriveRequest('GET', `deals/${dealId}`);
-    return result.data || null;
-  } catch (error) {
-    logError('pipedrive', `Błąd pobierania deala ${dealId}`, (error as Error).message);
-    return null;
-  }
+  return withCache(`pipedrive:deal:${dealId}`, CACHE_TTL.PIPEDRIVE_DEAL, async () => {
+    try {
+      const result = await pipedriveRequest('GET', `deals/${dealId}`);
+      return result.data || null;
+    } catch (error) {
+      logError('pipedrive', `Błąd pobierania deala ${dealId}`, (error as Error).message);
+      return null;
+    }
+  });
 }
 
 // Pobierz aktywne (otwarte) deale, opcjonalnie filtrowane po pipeline
@@ -149,15 +154,17 @@ export async function getActiveDeals(pipelineIds: number[] = []): Promise<any[]>
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function getDealNotes(dealId: number, limit = 50): Promise<any[]> {
   if (!isPipedriveEnabled()) return [];
-  try {
-    const result = await pipedriveRequest('GET', `deals/${dealId}/notes`, {
-      sort: 'update_time DESC', limit,
-    });
-    return result.data || [];
-  } catch (error) {
-    logError('pipedrive', `Błąd pobierania notatek deala ${dealId}`, (error as Error).message);
-    return [];
-  }
+  return withCache(`pipedrive:notes:${dealId}:${limit}`, CACHE_TTL.PIPEDRIVE_NOTES, async () => {
+    try {
+      const result = await pipedriveRequest('GET', `deals/${dealId}/notes`, {
+        sort: 'update_time DESC', limit,
+      });
+      return result.data || [];
+    } catch (error) {
+      logError('pipedrive', `Błąd pobierania notatek deala ${dealId}`, (error as Error).message);
+      return [];
+    }
+  });
 }
 
 // Znajdź ostatnią notatkę agenta po prefixie
@@ -179,6 +186,7 @@ export async function createNote(dealId: number, content: string, pinned = false
     });
     const noteId = result.data?.id;
     console.log(`[pipedrive] Utworzono notatkę na dealu ${dealId} (note_id=${noteId})`);
+    await invalidateCache(`pipedrive:notes:${dealId}:*`);
     return result.data || null;
   } catch (error) {
     logError('pipedrive', `Błąd tworzenia notatki na dealu ${dealId}`, (error as Error).message);
@@ -193,6 +201,7 @@ export async function updateNote(noteId: number, content: string): Promise<any> 
   try {
     const result = await pipedriveRequest('PUT', `notes/${noteId}`, {}, { content });
     console.log(`[pipedrive] Zaktualizowano notatkę ${noteId}`);
+    await invalidateCache('pipedrive:notes:*');
     return result.data || null;
   } catch (error) {
     logError('pipedrive', `Błąd aktualizacji notatki ${noteId}`, (error as Error).message);
@@ -210,6 +219,7 @@ export async function createActivity(dealId: number, subject: string, type = 'ta
     if (dueDate) body.due_date = dueDate;
     const result = await pipedriveRequest('POST', 'activities', {}, body);
     console.log(`[pipedrive] Utworzono aktywność na dealu ${dealId}: ${subject}`);
+    await invalidateCache(`pipedrive:deal:${dealId}`);
     return result.data || null;
   } catch (error) {
     logError('pipedrive', `Błąd tworzenia aktywności na dealu ${dealId}`, (error as Error).message);

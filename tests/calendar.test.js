@@ -1,5 +1,13 @@
 // Testy serwisu Google Calendar
 jest.mock('../src/services/errors', () => ({ logError: jest.fn() }));
+jest.mock('../src/services/cache', () => ({
+  withCache: jest.fn((_key, _ttl, fetcher) => fetcher()),
+  getCache: jest.fn().mockResolvedValue(null),
+  setCache: jest.fn().mockResolvedValue(undefined),
+  invalidateCache: jest.fn().mockResolvedValue(undefined),
+  isRedisEnabled: jest.fn().mockReturnValue(false),
+  CACHE_TTL: { NOTION_SEARCH: 1800, NOTION_PAGE: 3600, PIPEDRIVE_SEARCH: 900, PIPEDRIVE_DEAL: 1800, PIPEDRIVE_NOTES: 1800, WORKFORCE_TIMELINE: 7200, CALENDAR_EVENTS: 1800, CALAMARI_ABSENCES: 3600, USER_NAME: 86400, CHANNEL_NAME: 86400 },
+}));
 // workforce nie jest już potrzebny w calendar.js — nie mockujemy
 
 // Mock googleapis przed importem

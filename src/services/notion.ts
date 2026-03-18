@@ -1,6 +1,7 @@
 // src/services/notion.ts — integracja z Notion API
 import { Client } from '@notionhq/client';
 import { logError } from './errors.js';
+import { withCache, CACHE_TTL } from './cache.js';
 
 // Inicjalizacja klienta Notion (null gdy brak tokenu)
 const notion = process.env.NOTION_TOKEN
@@ -67,39 +68,41 @@ export async function searchNotion(query: string): Promise<NotionPage[]> {
 
   if (!keywords) return [];
 
-  try {
-    const words = keywords.split(' ');
-    const searches: Promise<{ results: NotionPage[] }>[] = [
-      notion.search({ query: keywords, filter: { property: 'object', value: 'page' }, page_size: 10 }) as Promise<{ results: NotionPage[] }>,
-    ];
-    if (words.length > 1) {
-      searches.push(
-        notion.search({ query: words[0], filter: { property: 'object', value: 'page' }, page_size: 10 }) as Promise<{ results: NotionPage[] }>,
-      );
-    }
+  return withCache(`notion:search:${keywords}`, CACHE_TTL.NOTION_SEARCH, async () => {
+    try {
+      const words = keywords.split(' ');
+      const searches: Promise<{ results: NotionPage[] }>[] = [
+        notion!.search({ query: keywords, filter: { property: 'object', value: 'page' }, page_size: 10 }) as Promise<{ results: NotionPage[] }>,
+      ];
+      if (words.length > 1) {
+        searches.push(
+          notion!.search({ query: words[0], filter: { property: 'object', value: 'page' }, page_size: 10 }) as Promise<{ results: NotionPage[] }>,
+        );
+      }
 
-    const responses = await Promise.all(searches);
-    const seen = new Set<string>();
-    const results: NotionPage[] = [];
-    for (const r of responses) {
-      for (const page of (r.results || [])) {
-        if (!seen.has(page.id)) {
-          seen.add(page.id);
-          results.push(page);
+      const responses = await Promise.all(searches);
+      const seen = new Set<string>();
+      const results: NotionPage[] = [];
+      for (const r of responses) {
+        for (const page of (r.results || [])) {
+          if (!seen.has(page.id)) {
+            seen.add(page.id);
+            results.push(page);
+          }
         }
       }
-    }
 
-    console.log(`[notion] Znaleziono ${results.length} stron`);
-    for (const p of results.slice(0, 10)) {
-      const title = getPageTitle(p);
-      console.log(`[notion]   - "${title}"`);
+      console.log(`[notion] Znaleziono ${results.length} stron`);
+      for (const p of results.slice(0, 10)) {
+        const title = getPageTitle(p);
+        console.log(`[notion]   - "${title}"`);
+      }
+      return results.slice(0, 10);
+    } catch (error) {
+      logError('notion', 'Błąd wyszukiwania Notion', (error as Error).message);
+      return [];
     }
-    return results.slice(0, 10);
-  } catch (error) {
-    logError('notion', 'Błąd wyszukiwania Notion', (error as Error).message);
-    return [];
-  }
+  });
 }
 
 // Typy bloków z których wyciągamy tekst
@@ -128,40 +131,42 @@ function getTableRowText(row: NotionBlock): string {
 export async function getPageText(pageId: string): Promise<string> {
   if (!notion) return '';
 
-  try {
-    const response = await notion.blocks.children.list({ block_id: pageId, page_size: 100 });
-    const blocks = response.results || [];
-    const texts: string[] = [];
+  return withCache(`notion:page:${pageId}`, CACHE_TTL.NOTION_PAGE, async () => {
+    try {
+      const response = await notion!.blocks.children.list({ block_id: pageId, page_size: 100 });
+      const blocks = response.results || [];
+      const texts: string[] = [];
 
-    for (const b of blocks) {
-      if (TEXT_BLOCK_TYPES.has((b as NotionBlock).type)) {
-        const text = getBlockText(b);
-        if (text) texts.push(text);
-      }
+      for (const b of blocks) {
+        if (TEXT_BLOCK_TYPES.has((b as NotionBlock).type)) {
+          const text = getBlockText(b);
+          if (text) texts.push(text);
+        }
 
-      if ((b as NotionBlock).has_children) {
-        try {
-          const children = await notion.blocks.children.list({ block_id: (b as NotionBlock).id, page_size: 50 });
-          for (const child of children.results) {
-            if ((child as NotionBlock).type === 'table_row') {
-              const row = getTableRowText(child);
-              if (row) texts.push(row);
-            } else if (TEXT_BLOCK_TYPES.has((child as NotionBlock).type)) {
-              const text = getBlockText(child);
-              if (text) texts.push(text);
+        if ((b as NotionBlock).has_children) {
+          try {
+            const children = await notion!.blocks.children.list({ block_id: (b as NotionBlock).id, page_size: 50 });
+            for (const child of children.results) {
+              if ((child as NotionBlock).type === 'table_row') {
+                const row = getTableRowText(child);
+                if (row) texts.push(row);
+              } else if (TEXT_BLOCK_TYPES.has((child as NotionBlock).type)) {
+                const text = getBlockText(child);
+                if (text) texts.push(text);
+              }
             }
-          }
-        } catch (_) {}
+          } catch (_) {}
+        }
+
+        if (texts.join(' ').length > 1500) break;
       }
 
-      if (texts.join(' ').length > 1500) break;
+      return texts.join(' ').substring(0, 1500);
+    } catch (error) {
+      logError('notion', 'Błąd pobierania strony', (error as Error).message);
+      return '';
     }
-
-    return texts.join(' ').substring(0, 1500);
-  } catch (error) {
-    logError('notion', 'Błąd pobierania strony', (error as Error).message);
-    return '';
-  }
+  });
 }
 
 // Wyciągnij tytuł strony z properties

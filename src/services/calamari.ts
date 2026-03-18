@@ -1,6 +1,7 @@
 // src/services/calamari.ts — integracja z Calamari API (urlopy i nieobecności)
 
 import { logError } from './errors.js';
+import { withCache, CACHE_TTL } from './cache.js';
 import type { Absence, DateRange } from '../types/index.js';
 
 const CALAMARI_URL = (process.env.CALAMARI_URL || '').replace(/\/$/, '');
@@ -23,8 +24,10 @@ export async function calamariFetch(path: string, body: Record<string, unknown> 
 
 // Pobierz nieobecności w danym zakresie dat (zaakceptowane + oczekujące)
 export async function getAbsences(from: string, to: string): Promise<Absence[]> {
-  const data = await calamariFetch('/api/leave/request/v1/find-advanced', { from, to }) as Absence[];
-  return (data || []).filter(r => r.status === 'ACCEPTED' || r.status === 'PENDING');
+  return withCache(`calamari:absences:${from}:${to}`, CACHE_TTL.CALAMARI_ABSENCES, async () => {
+    const data = await calamariFetch('/api/leave/request/v1/find-advanced', { from, to }) as Absence[];
+    return (data || []).filter(r => r.status === 'ACCEPTED' || r.status === 'PENDING');
+  });
 }
 
 // Parsuj zakres dat z zapytania (reużywa logikę z workforce)

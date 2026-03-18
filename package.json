@@ -30,7 +30,8 @@
     "@slack/bolt": "^4.6.0",
     "@supabase/supabase-js": "^2.97.0",
     "dotenv": "^17.3.1",
-    "googleapis": "^171.4.0"
+    "googleapis": "^171.4.0",
+    "ioredis": "^5.10.0"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
