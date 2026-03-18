@@ -12,6 +12,8 @@ import { createToolExecutors } from './services/toolExecutor.js';
 const useTools = process.env.ENABLE_TOOL_USE === 'true';
 import { setupWorkforceAlerts, setupWeeklySummary } from './services/workforceAlerts.js';
 import { setupDealDigest } from './services/dealDigest.js';
+import { initScheduler, stopAll } from './services/scheduler.js';
+import { disconnectCache } from './services/cache.js';
 import { validateMessage } from './services/validate.js';
 import { checkRateLimit } from './services/ratelimit.js';
 import { classifyMessage } from './services/classify.js';
@@ -245,10 +247,16 @@ setupDealDigest(app);
   const { setupProactive } = await import('./proactive/setup.js');
   await setupProactive(app);
 
+  // Scentralizowany scheduler — zastępuje wszystkie setInterval
+  await initScheduler(app);
+
   console.log('🤖 Iwan działa w Socket Mode!');
 })();
 
-// Health check — loguj co 5 minut
-setInterval(() => {
-  console.log(`💚 Iwan żyje — ${new Date().toISOString()}`);
-}, 5 * 60 * 1000);
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  console.log('[shutdown] SIGTERM received — stopping...');
+  stopAll();
+  await disconnectCache();
+  process.exit(0);
+});

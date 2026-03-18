@@ -17,7 +17,7 @@ const SUMMARY_HOUR = parseInt(process.env.WP_SUMMARY_HOUR || '', 10) || 8;
 const sentAlerts = new Set<string>();
 
 // Wyczyść stare alerty raz na dobę
-function clearOldAlerts(): void {
+export function clearOldAlerts(): void {
   sentAlerts.clear();
 }
 
@@ -81,23 +81,13 @@ export async function checkAlerts(app: SlackApp): Promise<void> {
   }
 }
 
-// Włącz cykliczne sprawdzanie alertów
-export function setupWorkforceAlerts(app: SlackApp): void {
+// Walidacja konfiguracji alertów (scheduling przeniesione do scheduler.ts)
+export function setupWorkforceAlerts(_app: SlackApp): void {
   if (!ALERT_CHANNEL || !process.env.WP_API_URL) {
     console.log('[workforce-alerts] Brak konfiguracji — alerty wyłączone');
     return;
   }
-
-  // Pierwsze sprawdzenie po 1 min od startu
-  setTimeout(() => checkAlerts(app), 60 * 1000);
-
-  // Kolejne co ALERT_INTERVAL
-  setInterval(() => checkAlerts(app), ALERT_INTERVAL);
-
-  // Czyść deduplikację co 24h
-  setInterval(clearOldAlerts, 24 * 3600 * 1000);
-
-  console.log(`[workforce-alerts] Alerty włączone (co ${ALERT_INTERVAL / 3600000}h)`);
+  console.log('[workforce-alerts] Alerty skonfigurowane');
 }
 
 // Generuj cotygodniowe podsumowanie alokacji
@@ -192,18 +182,11 @@ export function isWeeklySummaryTime(now: Date): boolean {
   return now.getDay() === 1 && now.getHours() === SUMMARY_HOUR;
 }
 
-// Włącz cotygodniowe podsumowanie (sprawdza co godzinę)
-export function setupWeeklySummary(app: SlackApp): void {
+// Walidacja konfiguracji weekly summary (scheduling przeniesione do scheduler.ts)
+export function setupWeeklySummary(_app: SlackApp): void {
   if (!SUMMARY_CHANNEL || !process.env.WP_API_URL) {
     console.log('[workforce-summary] Brak konfiguracji — summary wyłączone');
     return;
   }
-
-  setInterval(() => {
-    if (isWeeklySummaryTime(new Date())) {
-      generateWeeklySummary(app);
-    }
-  }, 3600 * 1000);
-
-  console.log(`[workforce-summary] Weekly summary włączone (poniedziałek ${SUMMARY_HOUR}:00)`);
+  console.log(`[workforce-summary] Weekly summary skonfigurowane (poniedziałek ${SUMMARY_HOUR}:00)`);
 }

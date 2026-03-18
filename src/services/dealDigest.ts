@@ -279,7 +279,7 @@ async function listChannels(app: SlackApp): Promise<any[]> {
 }
 
 // Uruchom daily digest
-async function runDailyDigest(app: SlackApp): Promise<void> {
+export async function runDailyDigest(app: SlackApp): Promise<void> {
   console.log('[dealDigest] Start daily digest...');
   let totalSummaries = 0;
   const allChannels = await listChannels(app);
@@ -324,18 +324,62 @@ export function isDigestTime(now: Date): boolean {
   return day >= 1 && day <= 5 && hour === DIGEST_HOUR;
 }
 
-// Włącz scheduled digest (sprawdza co godzinę)
-export function setupDealDigest(app: SlackApp): void {
+// Walidacja konfiguracji digestu (scheduling przeniesione do scheduler.ts)
+export function setupDealDigest(_app: SlackApp): void {
   if (!process.env.PIPEDRIVE_API_TOKEN) {
     console.log('[dealDigest] Brak PIPEDRIVE_API_TOKEN — digest wyłączony');
     return;
   }
+  console.log(`[dealDigest] Deal digest skonfigurowany (Pn-Pt o ${DIGEST_HOUR}:00)`);
+}
 
-  setInterval(() => {
-    if (isDigestTime(new Date())) {
-      runDailyDigest(app);
+// Pobierz timestamp ostatniej wiadomości w kanale
+export async function getLastMessageTimestamp(channelId: string): Promise<string | null> {
+  try {
+    const { data, error } = await supabase
+      .from('slack_messages')
+      .select('created_at')
+      .eq('channel_id', channelId)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (error) throw error;
+    if (!data || data.length === 0) return null;
+    return data[0].created_at;
+  } catch (error) {
+    logError('dealDigest', `Błąd pobierania last message ts dla ${channelId}`, (error as Error).message);
+    return null;
+  }
+}
+
+// Sprawdź kanały #sales-* bez aktywności 48h+
+export async function checkInactiveChannels(app: SlackApp): Promise<void> {
+  if (!DIGEST_CHANNEL) return;
+
+  console.log('[dealDigest] Sprawdzanie nieaktywnych kanałów...');
+  const allChannels = await listChannels(app);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const salesChannels = allChannels.filter((ch: any) => ch.name.startsWith(SALES_PREFIX));
+
+  const cutoff = new Date(Date.now() - 48 * 3600 * 1000).toISOString();
+  const inactive: string[] = [];
+
+  for (const ch of salesChannels) {
+    const lastTs = await getLastMessageTimestamp(ch.id);
+    if (!lastTs || lastTs < cutoff) {
+      inactive.push(`#${ch.name}`);
     }
-  }, 3600 * 1000);
+  }
 
-  console.log(`[dealDigest] Daily digest włączony (Pn-Pt o ${DIGEST_HOUR}:00)`);
+  if (inactive.length > 0) {
+    try {
+      await app.client.chat.postMessage({
+        channel: DIGEST_CHANNEL,
+        text: `⚠️ *Nieaktywne kanały sprzedażowe (48h+):*\n${inactive.join('\n')}`,
+      });
+      console.log(`[dealDigest] Alert: ${inactive.length} nieaktywnych kanałów`);
+    } catch (error) {
+      logError('dealDigest', 'Błąd wysyłania alertu nieaktywnych kanałów', (error as Error).message);
+    }
+  }
 }

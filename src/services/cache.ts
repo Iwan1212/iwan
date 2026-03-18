@@ -27,6 +27,7 @@ export const CACHE_TTL = {
   CALAMARI_ABSENCES: 60 * 60,
   USER_NAME: 24 * 60 * 60,
   CHANNEL_NAME: 24 * 60 * 60,
+  WORKFORCE_ANOMALY_SNAPSHOT: 90000,
 } as const;
 
 // Sprawdź czy Redis jest dostępny

@@ -42,12 +42,16 @@ jest.mock('../src/services/llm', () => ({
 
 process.env.ANTHROPIC_API_KEY = 'test-key';
 process.env.PIPEDRIVE_API_TOKEN = 'test-token';
+process.env.DEAL_DIGEST_CHANNEL = 'C_DIGEST';
 
 const {
   isDigestTime,
   computeMessageHash,
   formatMessages,
+  getLastMessageTimestamp,
+  checkInactiveChannels,
 } = require('../src/services/dealDigest');
+const { supabase } = require('../src/services/supabase');
 
 // --- isDigestTime ---
 
@@ -129,5 +133,110 @@ describe('formatMessages', () => {
 
   it('zwraca pusty string dla pustej tablicy', () => {
     expect(formatMessages([])).toBe('');
+  });
+});
+
+// --- getLastMessageTimestamp ---
+
+describe('getLastMessageTimestamp', () => {
+  it('zwraca null gdy brak wiadomości', async () => {
+    supabase.from.mockReturnValueOnce({
+      select: jest.fn(() => ({
+        eq: jest.fn(() => ({
+          order: jest.fn(() => ({
+            limit: jest.fn(() => Promise.resolve({ data: [], error: null })),
+          })),
+        })),
+      })),
+    });
+    const result = await getLastMessageTimestamp('C1');
+    expect(result).toBeNull();
+  });
+
+  it('zwraca timestamp ostatniej wiadomości', async () => {
+    supabase.from.mockReturnValueOnce({
+      select: jest.fn(() => ({
+        eq: jest.fn(() => ({
+          order: jest.fn(() => ({
+            limit: jest.fn(() => Promise.resolve({ data: [{ created_at: '2026-03-17T10:00:00Z' }], error: null })),
+          })),
+        })),
+      })),
+    });
+    const result = await getLastMessageTimestamp('C1');
+    expect(result).toBe('2026-03-17T10:00:00Z');
+  });
+
+  it('zwraca null przy błędzie bazy', async () => {
+    supabase.from.mockReturnValueOnce({
+      select: jest.fn(() => ({
+        eq: jest.fn(() => ({
+          order: jest.fn(() => ({
+            limit: jest.fn(() => Promise.resolve({ data: null, error: new Error('DB error') })),
+          })),
+        })),
+      })),
+    });
+    const result = await getLastMessageTimestamp('C1');
+    expect(result).toBeNull();
+  });
+});
+
+// --- checkInactiveChannels ---
+
+describe('checkInactiveChannels', () => {
+  const mockApp = {
+    client: {
+      conversations: {
+        list: jest.fn(() => Promise.resolve({
+          channels: [
+            { id: 'C1', name: 'sales-acme' },
+            { id: 'C2', name: 'sales-beta' },
+            { id: 'C3', name: 'general' },
+          ],
+        })),
+      },
+      chat: {
+        postMessage: jest.fn(() => Promise.resolve()),
+      },
+    },
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('wysyła alert dla nieaktywnych kanałów sales', async () => {
+    // Oba kanały sales bez wiadomości → getLastMessageTimestamp zwróci null
+    supabase.from.mockReturnValue({
+      select: jest.fn(() => ({
+        eq: jest.fn(() => ({
+          order: jest.fn(() => ({
+            limit: jest.fn(() => Promise.resolve({ data: [], error: null })),
+          })),
+        })),
+      })),
+    });
+    await checkInactiveChannels(mockApp);
+    expect(mockApp.client.chat.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: expect.stringContaining('Nieaktywne kanały sprzedażowe'),
+      })
+    );
+  });
+
+  it('nie wysyła alertu gdy kanały są aktywne', async () => {
+    const recentTs = new Date().toISOString();
+    supabase.from.mockReturnValue({
+      select: jest.fn(() => ({
+        eq: jest.fn(() => ({
+          order: jest.fn(() => ({
+            limit: jest.fn(() => Promise.resolve({ data: [{ created_at: recentTs }], error: null })),
+          })),
+        })),
+      })),
+    });
+    await checkInactiveChannels(mockApp);
+    expect(mockApp.client.chat.postMessage).not.toHaveBeenCalled();
   });
 });
