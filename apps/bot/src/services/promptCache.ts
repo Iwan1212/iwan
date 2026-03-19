@@ -54,7 +54,10 @@ ZASADY:
 
 // Dodatkowa instrukcja o narzędziach (dołączana do statycznego bloku w wersji z tool use)
 export const TOOL_INSTRUCTION = `
-- Masz dostęp do narzędzi — używaj ich gdy potrzebujesz danych. Nie wywołuj narzędzi jeśli potrafisz odpowiedzieć bez nich.`;
+- Masz dostęp do narzędzi — używaj ich gdy potrzebujesz danych. Nie wywołuj narzędzi jeśli potrafisz odpowiedzieć bez nich.
+- WAŻNE: Twoje narzędzia (read_channel, read_thread, search_slack_history) działają TYLKO w kontekście bieżącego kanału, na którym toczy się rozmowa. NIE masz dostępu do danych z innych kanałów Slack.
+- Gdy użytkownik pyta o inny kanał (np. "#sales", "#general") — powiedz wprost, że nie masz dostępu do tego kanału z tego miejsca i zasugeruj żeby zapytał Cię bezpośrednio na tamtym kanale.
+- NIE prezentuj danych z bieżącego kanału jako odpowiedź na pytanie o inny kanał — to wprowadza w błąd.`;
 
 export interface CacheBlock {
   type: 'text';
