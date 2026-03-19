@@ -135,3 +135,24 @@ export interface HealthStatus {
   version: string;
   timestamp: string;
 }
+
+// Access control types
+
+export type AccessLevel = 'open' | 'restricted';
+
+export type ChannelLabel = 'leadership' | 'growth' | 'general';
+
+export type DashboardRole = 'leadership' | 'growth';
+
+export type AuditResultStatus = 'success' | 'denied' | 'error';
+
+export interface AuditEntry {
+  channelId: string;
+  userId: string;
+  toolName: string;
+  toolInput?: Record<string, unknown>;
+  resultStatus: AuditResultStatus;
+  resultSummary?: string;
+  durationMs?: number;
+  threadTs?: string;
+}

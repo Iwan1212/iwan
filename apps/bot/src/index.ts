@@ -3,11 +3,12 @@ import 'dotenv/config';
 import { App } from '@slack/bolt';
 import { askClaude, askClaudeWithHistory, askClaudeWithContext } from './services/claude.js';
 import { searchSlackHistory, buildContextFromMessages } from './services/search.js';
-import { searchNotion, buildContextFromNotion } from './services/notion.js';
+import { searchNotion, buildContextFromNotion, filterNotionResults } from './services/notion.js';
+import { getChannelLabel } from './services/channelClassification.js';
 import { searchWorkforce, buildContextFromWorkforce, shouldQueryWorkforce } from './services/workforce.js';
 import { askClaudeWithTools } from './services/claudeTools.js';
 import { askHaiku } from './services/claudeHaiku.js';
-import { createToolExecutors } from './services/toolExecutor.js';
+import { createAuthorizedExecutors } from './services/authorizedExecutor.js';
 
 const useTools = process.env.ENABLE_TOOL_USE === 'true';
 import { setupWorkforceAlerts, setupWeeklySummary } from './services/workforceAlerts.js';
@@ -175,8 +176,8 @@ app.event('app_mention', async ({ event, say, context }: any) => {
   let odpowiedz: string;
   try {
     if (useTools) {
-      // Nowy flow: Claude decyduje które źródła odpytać
-      const executors = createToolExecutors(app, event.channel, threadTs);
+      // Nowy flow: Claude decyduje które źródła odpytać (z kontrola dostepu)
+      const executors = createAuthorizedExecutors(app, event.channel, threadTs, event.user);
       odpowiedz = await askClaudeWithTools(messages, executors, userName, companyContext);
     } else {
       // Legacy flow: wszystkie źródła odpytywane równolegle
@@ -187,7 +188,11 @@ app.event('app_mention', async ({ event, say, context }: any) => {
       ]);
       await resolveUserNames(app, wyniki);
       const slackKontekst = buildContextFromMessages(wyniki);
-      const notionKontekst = await buildContextFromNotion(notionPages);
+      // Filtruj restricted Notion databases w legacy flow
+      const channelLabelValue = await getChannelLabel(event.channel);
+      const hasLeadershipAccess = channelLabelValue === 'leadership';
+      const filteredPages = filterNotionResults(notionPages, hasLeadershipAccess);
+      const notionKontekst = await buildContextFromNotion(filteredPages);
       const workforceKontekst = buildContextFromWorkforce(workforceData);
       const kontekst = slackKontekst + notionKontekst + workforceKontekst;
 
@@ -206,7 +211,7 @@ app.event('app_mention', async ({ event, say, context }: any) => {
       console.log('[iwan] Retry bez obrazków...');
       messages[messages.length - 1] = { role: 'user', content: tekst || 'Nie udało się przetworzyć obrazka.' };
       try {
-        const executors = createToolExecutors(app, event.channel, threadTs);
+        const executors = createAuthorizedExecutors(app, event.channel, threadTs, event.user);
         odpowiedz = await askClaudeWithTools(messages, executors, userName, companyContext);
       } catch (_e2) {
         odpowiedz = 'Przepraszam, coś poszło nie tak. Spróbuj ponownie.';

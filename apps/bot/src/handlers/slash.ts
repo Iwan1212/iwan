@@ -1,6 +1,7 @@
 // src/handlers/slash.ts — obsługa komendy /iwan
 import { searchSlackHistory, buildContextFromMessages } from '../services/search.js';
-import { searchNotion, getPageTitle, getPageText } from '../services/notion.js';
+import { searchNotion, getPageTitle, getPageText, filterNotionResults } from '../services/notion.js';
+import { getChannelLabel } from '../services/channelClassification.js';
 import { getTimeline, getProjects, buildDateRange, getUtilPercent, getAllocPercent } from '../services/workforce.js';
 import { searchDeals, getDeal, getDealNotes, getActiveDeals, buildContextFromDeal, isPipedriveEnabled } from '../services/pipedrive.js';
 import { ACTIVE_PIPELINES } from '../services/dealConfig.js';
@@ -39,7 +40,7 @@ export function setupSlashCommand(app: SlackApp): void {
     if (action === 'szukaj') {
       await handleSearch(app, command, args, respond);
     } else if (action === 'notion') {
-      await handleNotion(args, respond);
+      await handleNotion(args, command.channel_id, respond);
     } else if (action === 'status') {
       await handleStatus(respond);
     } else if (action === 'team') {
@@ -85,14 +86,17 @@ async function handleSearch(app: SlackApp, command: any, query: string, respond:
   await respond(`Wyniki dla *${query}* (${wyniki.length}):\n${lista}`);
 }
 
-// /iwan notion <fraza> — wyszukaj w Notion
-async function handleNotion(query: string, respond: RespondFn): Promise<void> {
+// /iwan notion <fraza> — wyszukaj w Notion (z filtrowaniem restricted databases)
+async function handleNotion(query: string, channelId: string, respond: RespondFn): Promise<void> {
   if (!query) {
     await respond('Użycie: `/iwan notion <fraza>`');
     return;
   }
 
-  const pages = await searchNotion(query);
+  const allPages = await searchNotion(query);
+  const channelLabelValue = await getChannelLabel(channelId);
+  const hasLeadershipAccess = channelLabelValue === 'leadership';
+  const pages = filterNotionResults(allPages, hasLeadershipAccess);
 
   if (pages.length === 0) {
     await respond(`Nie znalazłem nic w Notion dla: *${query}*`);

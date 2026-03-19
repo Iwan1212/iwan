@@ -18,4 +18,9 @@ export type {
   SchedulerJobInfo,
   CacheStats,
   HealthStatus,
+  AccessLevel,
+  ChannelLabel,
+  DashboardRole,
+  AuditResultStatus,
+  AuditEntry,
 } from '@iwan/shared';

@@ -1,6 +1,6 @@
 // src/proactive/proactiveRespond.ts — generowanie i wysyłanie proaktywnej odpowiedzi
 import { askClaudeProactive } from './proactiveClaudeCall.js';
-import { createToolExecutors } from '../services/toolExecutor.js';
+import { createAuthorizedExecutors } from '../services/authorizedExecutor.js';
 import { toSlackMarkdown } from '../services/format.js';
 import { saveMessage } from '../services/memory.js';
 
@@ -24,7 +24,7 @@ ${conversationText}`,
 // Wygeneruj i wyślij proaktywną odpowiedź na Slack
 export async function sendProactiveResponse(app: SlackApp, channelId: string, threadTs: string, conversationText: string, triggerReason: string, companyContext: string): Promise<string | null> {
   const messages = buildProactiveMessages(conversationText, triggerReason);
-  const executors = createToolExecutors(app, channelId, threadTs);
+  const executors = createAuthorizedExecutors(app, channelId, threadTs, 'IWAN_PROACTIVE');
 
   const odpowiedz = await askClaudeProactive(messages, executors, companyContext);
   if (!odpowiedz || !odpowiedz.trim()) return null;

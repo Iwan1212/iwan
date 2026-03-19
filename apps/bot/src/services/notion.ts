@@ -181,6 +181,29 @@ export function getPageTitle(page: NotionPage): string {
   return 'Bez tytułu';
 }
 
+// Parsuj NOTION_RESTRICTED_DATABASES (raz na starcie)
+const RESTRICTED_DATABASES: Set<string> = new Set(
+  (process.env.NOTION_RESTRICTED_DATABASES || '')
+    .split(',')
+    .map(id => id.trim())
+    .filter(Boolean),
+);
+
+// Filtruj wyniki Notion -- ukryj restricted databases dla non-leadership users
+export function filterNotionResults(
+  pages: NotionPage[],
+  userHasLeadershipAccess: boolean,
+): NotionPage[] {
+  if (RESTRICTED_DATABASES.size === 0) return pages;
+  if (userHasLeadershipAccess) return pages;
+
+  return pages.filter(page => {
+    const dbId = page.parent?.database_id;
+    if (!dbId) return true;
+    return !RESTRICTED_DATABASES.has(dbId);
+  });
+}
+
 // Zbuduj kontekst z wyników Notion (analogicznie do buildContextFromMessages)
 export async function buildContextFromNotion(pages: NotionPage[]): Promise<string> {
   if (pages.length === 0) return '';
