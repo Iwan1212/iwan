@@ -143,6 +143,42 @@ describe('setupApprovalActions', () => {
     expect(pendingApprovals.has('C1')).toBe(false);
   });
 
+  it('approve_channel — idempotentny przy duplicate event (Slack retry)', async () => {
+    const app = createMockApp();
+    pendingApprovals.set('C1', { channelId: 'C1', channelName: 'general', inviterId: 'UINVITER' });
+
+    setupApprovalActions(app);
+    const approveHandler = app.action.mock.calls.find(c => c[0] === 'approve_channel')[1];
+
+    const mockClient = {
+      chat: {
+        postMessage: jest.fn().mockResolvedValue({ ok: true }),
+        update: jest.fn().mockResolvedValue({ ok: true }),
+      },
+    };
+
+    const event = {
+      action: { value: 'C1' },
+      body: {
+        channel: { id: 'DADMIN' },
+        message: { ts: '1.1', blocks: [{ text: { text: 'Zostałem dodany do *#general*' } }] },
+      },
+      client: mockClient,
+    };
+
+    // Pierwszy event — pełny flow
+    await approveHandler(event);
+    // Drugi event (Slack retry) — powinien zostać zignorowany
+    await approveHandler(event);
+
+    // Welcome wysłany TYLKO RAZ
+    expect(mockClient.chat.postMessage).toHaveBeenCalledTimes(1);
+    // Backfill triggered TYLKO RAZ
+    expect(backfillChannel).toHaveBeenCalledTimes(1);
+    // DM admina updateowany TYLKO RAZ
+    expect(mockClient.chat.update).toHaveBeenCalledTimes(1);
+  });
+
   it('reject_channel — opuszcza kanał', async () => {
     const app = createMockApp();
     pendingApprovals.set('C1', { channelId: 'C1', inviterId: 'UINVITER' });

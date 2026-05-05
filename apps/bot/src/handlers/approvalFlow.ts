@@ -85,9 +85,14 @@ export function setupApprovalActions(app: SlackApp): void {
   app.action('approve_channel', async ({ action, body, client }: any) => {
     const channelId = action.value;
 
-    // Pobierz nazwę kanału (z pending lub Slack API jako fallback)
+    // Idempotencja — Slack ponawia request jeśli pierwsza odpowiedź nie wróci w 3s.
+    // Atomic check-and-delete: drugi event widzi pusty stan i wraca bez side-effects.
     const pending = pendingApprovals.get(channelId);
-    let channelName = pending?.channelName || '';
+    if (!pending) return;
+    pendingApprovals.delete(channelId);
+
+    // Pobierz nazwę kanału (z pending lub Slack API jako fallback)
+    let channelName = pending.channelName || '';
     if (!channelName) {
       try {
         const info = await client.conversations.info({ channel: channelId });
@@ -121,13 +126,15 @@ export function setupApprovalActions(app: SlackApp): void {
         },
       ],
     });
-
-    pendingApprovals.delete(channelId);
   });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   app.action('reject_channel', async ({ action, body, client }: any) => {
     const channelId = action.value;
+
+    // Idempotencja — patrz approve_channel
+    if (!pendingApprovals.has(channelId)) return;
+    pendingApprovals.delete(channelId);
 
     // Opuść kanał
     await client.conversations.leave({ channel: channelId });
@@ -147,8 +154,6 @@ export function setupApprovalActions(app: SlackApp): void {
         },
       ],
     });
-
-    pendingApprovals.delete(channelId);
   });
 
   console.log('✅ Approval flow aktywny');
