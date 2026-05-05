@@ -21,7 +21,7 @@ const SALES_PREFIX = process.env.DEAL_SALES_PREFIX || 'sales-';
 export function buildWelcomeText(channelName: string): string {
   if (channelName.startsWith(SALES_PREFIX)) {
     return [
-      'Cześć! Jestem *Iwan* — AI asystent sales w Momentum. 🤖',
+      'Cześć! Jestem *Iwan* — AI asystent w Momentum. 🤖',
       '',
       'W tym kanale będę:',
       '• 📊 Codziennie rano (Pn–Pt o 7:00) podsumowywać wątki i zapisywać do Pipedrive jako notatkę `[Slack Summary]`',

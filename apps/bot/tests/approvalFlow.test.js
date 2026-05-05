@@ -251,7 +251,7 @@ describe('setupApprovalActions', () => {
 describe('buildWelcomeText', () => {
   it('zwraca dedykowane powitanie sales dla kanału z prefixem', () => {
     const text = buildWelcomeText('sales_wrenkitchens');
-    expect(text).toContain('asystent sales');
+    expect(text).toContain('AI asystent w Momentum');
     expect(text).toContain('Pipedrive');
     expect(text).toContain('podsumowywać wątki');
     expect(text).toContain('/iwan deal');
@@ -261,7 +261,7 @@ describe('buildWelcomeText', () => {
     const text = buildWelcomeText('general');
     expect(text).toContain('AI asystent w Momentum');
     expect(text).not.toContain('Pipedrive');
-    expect(text).not.toContain('asystent sales');
+    expect(text).not.toContain('podsumowywać wątki');
   });
 
   it('działa też z nazwą pustą (fallback)', () => {
