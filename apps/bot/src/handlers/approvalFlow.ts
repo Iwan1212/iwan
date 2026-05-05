@@ -7,13 +7,34 @@ type SlackApp = any;
 
 interface PendingApproval {
   channelId: string;
+  channelName: string;
   inviterId: string | undefined;
 }
 
-// Pending approvals — in-memory store (Map<channelId, { channelId, inviterId }>)
+// Pending approvals — in-memory store (Map<channelId, { channelId, channelName, inviterId }>)
 export const pendingApprovals = new Map<string, PendingApproval>();
 
 const ADMIN_USER_ID = process.env.SLACK_ADMIN_USER_ID;
+const SALES_PREFIX = process.env.DEAL_SALES_PREFIX || 'sales-';
+
+// Wybierz tekst powitania — dedykowany dla sales channels, standardowy dla pozostałych
+export function buildWelcomeText(channelName: string): string {
+  if (channelName.startsWith(SALES_PREFIX)) {
+    return [
+      'Cześć! Jestem *Iwan* — AI asystent sales w Momentum. 🤖',
+      '',
+      'W tym kanale będę:',
+      '• 📊 Codziennie rano (Pn–Pt o 7:00) podsumowywać wątki i zapisywać do Pipedrive jako notatkę `[Slack Summary]`',
+      '• 🔍 Na żądanie mapować rozmowy do deala w CRM — napisz `@Iwan podsumuj ten wątek`',
+      '• 💬 Odpowiadać na pytania o tego klienta — `@Iwan jaki jest status?`',
+      '',
+      'Komendy: `/iwan deal <nazwa>` · `/iwan deals` · `/iwan status`',
+      '',
+      'Zaczynam od backfilla historii kanału. ⏳',
+    ].join('\n');
+  }
+  return 'Cześć! Jestem Iwan — AI asystent w Momentum. Wspomnij mnie @Iwan, a postaram się pomóc. 🤖';
+}
 
 // Wyślij DM do admina z przyciskami zatwierdzenia
 export async function sendApprovalRequest(app: SlackApp, channelId: string, inviterId?: string): Promise<void> {
@@ -22,7 +43,7 @@ export async function sendApprovalRequest(app: SlackApp, channelId: string, invi
 
   const inviterMention = inviterId ? `<@${inviterId}>` : 'ktoś';
 
-  pendingApprovals.set(channelId, { channelId, inviterId });
+  pendingApprovals.set(channelId, { channelId, channelName, inviterId });
 
   await app.client.chat.postMessage({
     channel: ADMIN_USER_ID,
@@ -64,10 +85,20 @@ export function setupApprovalActions(app: SlackApp): void {
   app.action('approve_channel', async ({ action, body, client }: any) => {
     const channelId = action.value;
 
-    // Wyślij wiadomość powitalną do kanału
+    // Pobierz nazwę kanału (z pending lub Slack API jako fallback)
+    const pending = pendingApprovals.get(channelId);
+    let channelName = pending?.channelName || '';
+    if (!channelName) {
+      try {
+        const info = await client.conversations.info({ channel: channelId });
+        channelName = info.channel?.name || '';
+      } catch { /* fallback do standardowego powitania */ }
+    }
+
+    // Wyślij wiadomość powitalną do kanału (dedykowaną dla sales lub standardową)
     await client.chat.postMessage({
       channel: channelId,
-      text: 'Cześć! Jestem Iwan — AI asystent w Momentum. Wspomnij mnie @Iwan, a postaram się pomóc. 🤖',
+      text: buildWelcomeText(channelName),
     });
 
     // Backfill — fire-and-forget

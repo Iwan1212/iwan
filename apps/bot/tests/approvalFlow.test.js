@@ -4,10 +4,11 @@ jest.mock('../src/crawler/backfill', () => ({
 }));
 jest.mock('../src/services/errors', () => ({ logError: jest.fn() }));
 
-// Ustaw SLACK_ADMIN_USER_ID przed importem modułu
+// Ustaw env vars przed importem modułu (SALES_PREFIX czytane w czasie importu)
 process.env.SLACK_ADMIN_USER_ID = 'UADMIN';
+process.env.DEAL_SALES_PREFIX = 'sales_';
 
-const { sendApprovalRequest, setupApprovalActions, pendingApprovals } = require('../src/handlers/approvalFlow');
+const { sendApprovalRequest, setupApprovalActions, pendingApprovals, buildWelcomeText } = require('../src/handlers/approvalFlow');
 const { backfillChannel } = require('../src/crawler/backfill');
 
 // Helper — stwórz mock app
@@ -62,7 +63,7 @@ describe('sendApprovalRequest', () => {
     await sendApprovalRequest(app, 'C1', 'UINVITER');
 
     expect(pendingApprovals.has('C1')).toBe(true);
-    expect(pendingApprovals.get('C1')).toEqual({ channelId: 'C1', inviterId: 'UINVITER' });
+    expect(pendingApprovals.get('C1')).toEqual({ channelId: 'C1', channelName: 'general', inviterId: 'UINVITER' });
   });
 
   it('obsługuje brak invitera', async () => {
@@ -244,5 +245,28 @@ describe('setupApprovalActions', () => {
     expect(updateCall.blocks).toHaveLength(1);
     expect(updateCall.blocks[0].text.text).toContain('❌');
     expect(updateCall.blocks[0].text.text).toContain('Odrzucono');
+  });
+});
+
+describe('buildWelcomeText', () => {
+  it('zwraca dedykowane powitanie sales dla kanału z prefixem', () => {
+    const text = buildWelcomeText('sales_wrenkitchens');
+    expect(text).toContain('asystent sales');
+    expect(text).toContain('Pipedrive');
+    expect(text).toContain('podsumowywać wątki');
+    expect(text).toContain('/iwan deal');
+  });
+
+  it('zwraca standardowe powitanie dla zwykłego kanału', () => {
+    const text = buildWelcomeText('general');
+    expect(text).toContain('AI asystent w Momentum');
+    expect(text).not.toContain('Pipedrive');
+    expect(text).not.toContain('asystent sales');
+  });
+
+  it('działa też z nazwą pustą (fallback)', () => {
+    const text = buildWelcomeText('');
+    expect(text).toContain('Iwan');
+    expect(text).not.toContain('Pipedrive');
   });
 });
