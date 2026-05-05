@@ -10,9 +10,9 @@ import type { ToolExecutors } from '../types/index.js';
 type MessageParam = any;
 
 // Wyślij wiadomość do Claude w trybie proaktywnym (max 512 tokenów)
-export async function askClaudeProactive(messages: MessageParam[], executors: ToolExecutors, companyContext = ''): Promise<string> {
+export async function askClaudeProactive(messages: MessageParam[], executors: ToolExecutors, companyContext = '', channelName?: string): Promise<string> {
   const tools = getToolDefinitionsWithCache();
-  const systemPrompt = buildProactiveSystemPrompt(companyContext);
+  const systemPrompt = buildProactiveSystemPrompt(companyContext, channelName);
   let currentMessages = [...messages];
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {

@@ -9,6 +9,7 @@ import { searchWorkforce, buildContextFromWorkforce, shouldQueryWorkforce } from
 import { askClaudeWithTools } from './services/claudeTools.js';
 import { askHaiku } from './services/claudeHaiku.js';
 import { createAuthorizedExecutors } from './services/authorizedExecutor.js';
+import { getChannelName } from './services/channels.js';
 
 const useTools = process.env.ENABLE_TOOL_USE === 'true';
 import { setupWorkforceAlerts, setupWeeklySummary } from './services/workforceAlerts.js';
@@ -118,9 +119,10 @@ app.event('app_mention', async ({ event, say, context }: any) => {
   }
 
   // 5-7. Dwa tryby: tool use (Claude decyduje co odpytać) lub legacy (wszystko na raz)
-  const [userName, companyContext] = await Promise.all([
+  const [userName, companyContext, channelName] = await Promise.all([
     getUserName(app, event.user),
     getCompanyContext(tekst),
+    getChannelName(app, event.channel),
   ]);
   const historia = await getHistory(event.channel, threadTs);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -178,7 +180,7 @@ app.event('app_mention', async ({ event, say, context }: any) => {
     if (useTools) {
       // Nowy flow: Claude decyduje które źródła odpytać (z kontrola dostepu)
       const executors = createAuthorizedExecutors(app, event.channel, threadTs, event.user);
-      odpowiedz = await askClaudeWithTools(messages, executors, userName, companyContext);
+      odpowiedz = await askClaudeWithTools(messages, executors, userName, companyContext, channelName);
     } else {
       // Legacy flow: wszystkie źródła odpytywane równolegle
       const [wyniki, notionPages, workforceData] = await Promise.all([
@@ -212,7 +214,7 @@ app.event('app_mention', async ({ event, say, context }: any) => {
       messages[messages.length - 1] = { role: 'user', content: tekst || 'Nie udało się przetworzyć obrazka.' };
       try {
         const executors = createAuthorizedExecutors(app, event.channel, threadTs, event.user);
-        odpowiedz = await askClaudeWithTools(messages, executors, userName, companyContext);
+        odpowiedz = await askClaudeWithTools(messages, executors, userName, companyContext, channelName);
       } catch (_e2) {
         odpowiedz = 'Przepraszam, coś poszło nie tak. Spróbuj ponownie.';
       }

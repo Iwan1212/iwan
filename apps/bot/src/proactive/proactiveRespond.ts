@@ -22,11 +22,11 @@ ${conversationText}`,
 }
 
 // Wygeneruj i wyślij proaktywną odpowiedź na Slack
-export async function sendProactiveResponse(app: SlackApp, channelId: string, threadTs: string, conversationText: string, triggerReason: string, companyContext: string): Promise<string | null> {
+export async function sendProactiveResponse(app: SlackApp, channelId: string, threadTs: string, conversationText: string, triggerReason: string, companyContext: string, channelName?: string): Promise<string | null> {
   const messages = buildProactiveMessages(conversationText, triggerReason);
   const executors = createAuthorizedExecutors(app, channelId, threadTs, 'IWAN_PROACTIVE');
 
-  const odpowiedz = await askClaudeProactive(messages, executors, companyContext);
+  const odpowiedz = await askClaudeProactive(messages, executors, companyContext, channelName);
   if (!odpowiedz || !odpowiedz.trim()) return null;
 
   const sformatowana = toSlackMarkdown(odpowiedz);

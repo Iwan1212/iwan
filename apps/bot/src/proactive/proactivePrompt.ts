@@ -3,8 +3,8 @@ import { buildCachedToolSystemPrompt } from '../services/promptCache.js';
 import type { CacheBlock } from '../services/promptCache.js';
 
 // Zbuduj system prompt dla proaktywnej odpowiedzi (array bloków z cache_control)
-export function buildProactiveSystemPrompt(companyContext: string): CacheBlock[] {
-  const baseBlocks = buildCachedToolSystemPrompt('Iwan (proaktywny)', companyContext);
+export function buildProactiveSystemPrompt(companyContext: string, channelName?: string): CacheBlock[] {
+  const baseBlocks = buildCachedToolSystemPrompt('Iwan (proaktywny)', companyContext, channelName);
 
   return [
     ...baseBlocks,

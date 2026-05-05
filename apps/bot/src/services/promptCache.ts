@@ -65,17 +65,18 @@ export interface CacheBlock {
   cache_control?: { type: string };
 }
 
-// Zbuduj dynamiczną część prompta (data, userName, companyContext)
-function buildDynamicBlock(userName: string, companyContext: string): string {
+// Zbuduj dynamiczną część prompta (data, userName, companyContext, channelName)
+function buildDynamicBlock(userName: string, companyContext: string, channelName?: string): string {
   const today = new Date().toISOString().split('T')[0];
-  return `\n- Dzisiejsza data: ${today}.\n- Aktualnie rozmawia z Tobą: ${userName}.${companyContext}`;
+  const channelInfo = channelName ? `\n- Jesteś na kanale: #${channelName}. Twoje narzędzia Slack (read_channel, read_thread, search_slack_history) czytają TYLKO dane z tego kanału.` : '';
+  return `\n- Dzisiejsza data: ${today}.\n- Aktualnie rozmawia z Tobą: ${userName}.${companyContext}${channelInfo}`;
 }
 
 // Helper: zbuduj 2-blokową strukturę z cache_control
-function buildCachedBlocks(staticText: string, userName: string, companyContext: string): CacheBlock[] {
+function buildCachedBlocks(staticText: string, userName: string, companyContext: string, channelName?: string): CacheBlock[] {
   return [
     { type: 'text', text: staticText, cache_control: { type: 'ephemeral' } },
-    { type: 'text', text: buildDynamicBlock(userName, companyContext) },
+    { type: 'text', text: buildDynamicBlock(userName, companyContext, channelName) },
   ];
 }
 
@@ -85,6 +86,6 @@ export function buildCachedSystemPrompt(userName: string, companyContext: string
 }
 
 // Zbuduj system prompt z cache_control (wersja z narzędziami)
-export function buildCachedToolSystemPrompt(userName: string, companyContext: string): CacheBlock[] {
-  return buildCachedBlocks(STATIC_SYSTEM_PROMPT + TOOL_INSTRUCTION, userName, companyContext);
+export function buildCachedToolSystemPrompt(userName: string, companyContext: string, channelName?: string): CacheBlock[] {
+  return buildCachedBlocks(STATIC_SYSTEM_PROMPT + TOOL_INSTRUCTION, userName, companyContext, channelName);
 }

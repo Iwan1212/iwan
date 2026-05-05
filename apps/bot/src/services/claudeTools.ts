@@ -23,9 +23,9 @@ export function extractText(response: MessageResponse): string {
 }
 
 // Wyślij wiadomość do Claude z narzędziami i pętlą tool use
-export async function askClaudeWithTools(messages: unknown[], executors: ToolExecutors, userName: string, companyContext = ''): Promise<string> {
+export async function askClaudeWithTools(messages: unknown[], executors: ToolExecutors, userName: string, companyContext = '', channelName?: string): Promise<string> {
   const tools = getToolDefinitionsWithCache();
-  const systemPrompt = buildCachedToolSystemPrompt(userName, companyContext);
+  const systemPrompt = buildCachedToolSystemPrompt(userName, companyContext, channelName);
   let currentMessages = [...messages];
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {

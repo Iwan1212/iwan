@@ -121,7 +121,7 @@ export async function evaluateMessage(app: SlackApp, message: SlackMessage, chan
     // 8. Wygeneruj i wyślij odpowiedź (ZAWSZE w wątku — message.ts jako fallback)
     const companyContext = await getCompanyContext(message.text || '');
     const threadTs = message.thread_ts || message.ts;
-    await sendProactiveResponse(app, channelId, threadTs, conversationText, triggerReason, companyContext);
+    await sendProactiveResponse(app, channelId, threadTs, conversationText, triggerReason, companyContext, channelName);
 
     // 9. Zaznacz jako obsłużone — zarówno wątek jak i kanał
     recordProactiveResponse();
