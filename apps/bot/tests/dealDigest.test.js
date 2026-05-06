@@ -187,8 +187,8 @@ describe('getLastMessageTimestamp', () => {
 describe('checkInactiveChannels', () => {
   const mockApp = {
     client: {
-      conversations: {
-        list: jest.fn(() => Promise.resolve({
+      users: {
+        conversations: jest.fn(() => Promise.resolve({
           channels: [
             { id: 'C1', name: 'sales-acme' },
             { id: 'C2', name: 'sales-beta' },

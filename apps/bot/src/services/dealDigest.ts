@@ -264,12 +264,14 @@ export async function processSharedChannel(app: SlackApp, channelId: string, cha
   return written;
 }
 
-// Pobierz listę publicznych kanałów ze Slack (1 API call zamiast N+1)
+// Pobierz listę kanałów do których bot należy (public + private).
+// users.conversations zamiast conversations.list — bot widzi prywatne kanały tylko
+// jako członek, a nie ma sensu iterować po kanałach do których nie mamy historii.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function listChannels(app: SlackApp): Promise<any[]> {
   try {
-    const result = await app.client.conversations.list({
-      types: 'public_channel', limit: 1000, exclude_archived: true,
+    const result = await app.client.users.conversations({
+      types: 'public_channel,private_channel', limit: 1000, exclude_archived: true,
     });
     return result.channels || [];
   } catch (error) {
